@@ -8,15 +8,26 @@ function EmployeesPage() {
   const [employees, setEmployees] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterPosition, setFilterPosition] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadEmployees() {
-      const data = await getEmployees();
-      setEmployees(data);
+      try {
+        const data = await getEmployees();
+        if (!cancelled) setEmployees(data);
+      } catch (err) {
+        if (!cancelled) setError(err.message || "Greška pri učitavanju zaposlenih.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
 
     loadEmployees();
+    return () => { cancelled = true; };
   }, []);
 
   const uniquePositions = useMemo(() => {
@@ -45,6 +56,30 @@ function EmployeesPage() {
     setSearchTerm("");
     setFilterPosition("");
   };
+
+  if (loading) {
+    return (
+      <div className="page-bg">
+        <div className="content-wrapper">
+          <div className="employee-card">
+            <p style={{ textAlign: "center", color: "#666" }}>Učitavanje...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="page-bg">
+        <div className="content-wrapper">
+          <div className="employee-card">
+            <p style={{ textAlign: "center", color: "#c00" }}>{error}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-bg">

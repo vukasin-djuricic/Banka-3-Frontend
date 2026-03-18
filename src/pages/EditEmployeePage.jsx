@@ -33,6 +33,7 @@ export default function EditEmployeePage() {
   const [successMsg, setSuccessMsg] = useState("");
   const [loading, setLoading] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [pageError, setPageError] = useState("");
 
   useEffect(() => {
     getEmployeeById(Number(id))
@@ -47,8 +48,12 @@ export default function EditEmployeePage() {
           aktivan: employee.active ?? true,
         });
       })
-      .catch(() => {
-        setNotFound(true);
+      .catch((err) => {
+        if (err.response?.status === 404) {
+          setNotFound(true);
+        } else {
+          setPageError(err.message || "Greška pri učitavanju zaposlenog.");
+        }
       });
   }, [id]);
 
@@ -111,6 +116,20 @@ export default function EditEmployeePage() {
         <div style={{ display: "flex", justifyContent: "center", paddingTop: "80px" }}>
           <div className="create-form-card">
             <h2>Zaposleni nije pronađen.</h2>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (pageError) {
+    return (
+      <div className="page-bg">
+        <img src="/bank-logo.png" alt="logo" className="bank-logo" />
+        <img src="/menu-icon.png" alt="menu" className="menu-icon" />
+        <div style={{ display: "flex", justifyContent: "center", paddingTop: "80px" }}>
+          <div className="create-form-card">
+            <p style={{ textAlign: "center", color: "#c00" }}>{pageError}</p>
           </div>
         </div>
       </div>

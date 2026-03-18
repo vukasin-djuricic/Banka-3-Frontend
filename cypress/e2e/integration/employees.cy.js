@@ -198,6 +198,102 @@ describe("Employee API integracija", () => {
     });
   });
 
+  describe("Get Employees (GET /api/employees)", () => {
+    it("vraca listu zaposlenih sa 200", () => {
+      cy.request({
+        method: "GET",
+        url: "/api/employees",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }).then((resp) => {
+        expect(resp.status).to.eq(200);
+        expect(resp.body).to.have.property("employees");
+        expect(resp.body.employees).to.be.an("array");
+      });
+    });
+
+    it("svaki zaposleni ima ocekivana polja", () => {
+      cy.request({
+        method: "GET",
+        url: "/api/employees",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }).then((resp) => {
+        expect(resp.body.employees.length).to.be.greaterThan(0);
+        const emp = resp.body.employees[0];
+        expect(emp).to.have.property("id");
+        expect(emp).to.have.property("first_name");
+        expect(emp).to.have.property("last_name");
+        expect(emp).to.have.property("email");
+        expect(emp).to.have.property("position");
+        expect(emp).to.have.property("active");
+      });
+    });
+
+    it("filtriranje po poziciji vraca filtrirane rezultate", () => {
+      cy.request({
+        method: "GET",
+        url: "/api/employees?position=Tester",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }).then((resp) => {
+        expect(resp.status).to.eq(200);
+        expect(resp.body).to.have.property("employees");
+      });
+    });
+  });
+
+  describe("Update Employee (PUT /api/employees/:id)", () => {
+    it("azurira zaposlenog i vraca valid true", () => {
+      cy.request({
+        method: "PUT",
+        url: "/api/employees/1",
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: {
+          last_name: "Petrović",
+          gender: "M",
+          phone_number: "+381601234567",
+          address: "Knez Mihailova 1, Beograd",
+          position: "Menadžer",
+          department: "Menadžment",
+          active: true,
+        },
+      }).then((resp) => {
+        expect(resp.status).to.eq(200);
+        expect(resp.body).to.have.property("valid", true);
+      });
+    });
+
+    it("nepostojeci ID vraca gresku", () => {
+      cy.request({
+        method: "PUT",
+        url: "/api/employees/999999",
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: {
+          last_name: "Test",
+          gender: "M",
+          phone_number: "0641234567",
+          address: "Beograd",
+          position: "Tester",
+          department: "IT",
+          active: true,
+        },
+        failOnStatusCode: false,
+      }).then((resp) => {
+        expect(resp.status).to.be.oneOf([400, 404, 500]);
+      });
+    });
+
+    it("nevazeci ID vraca 400", () => {
+      cy.request({
+        method: "PUT",
+        url: "/api/employees/abc",
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: { last_name: "Test" },
+        failOnStatusCode: false,
+      }).then((resp) => {
+        expect(resp.status).to.eq(400);
+      });
+    });
+  });
+
   describe("Healthcheck", () => {
     it("GET /healthz vraca 200 sa status ok", () => {
       cy.request({

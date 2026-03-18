@@ -1,7 +1,34 @@
+const mockEmployees = [
+  {
+    id: 1, first_name: "Petar", last_name: "Petrović",
+    email: "petar@primer.rs", position: "Menadžer",
+    phone_number: "+381601234567", active: true,
+  },
+  {
+    id: 2, first_name: "Ana", last_name: "Jovanović",
+    email: "ana@primer.rs", position: "Finansije",
+    phone_number: "+381607654321", active: true,
+  },
+  {
+    id: 3, first_name: "Nikola", last_name: "Marković",
+    email: "nikola@primer.rs", position: "Analitičar",
+    phone_number: "+381609876543", active: true,
+  },
+  {
+    id: 4, first_name: "Nikola", last_name: "Jovanovic",
+    email: "nikola2@primer.rs", position: "Analitičar",
+    phone_number: "+381611112233", active: false,
+  },
+];
+
 describe("Lista zaposlenih", () => {
   beforeEach(() => {
     cy.loginBypass();
+    cy.intercept("GET", "**/api/employees?*", {
+      body: { employees: mockEmployees },
+    }).as("getEmployees");
     cy.visit("/employees");
+    cy.wait("@getEmployees");
   });
 
   it("employees stranica se ucitava sa heading-om", () => {
@@ -43,5 +70,30 @@ describe("Lista zaposlenih", () => {
 
   it("filter info prikazuje tacan broj", () => {
     cy.get(".filter-info").should("contain", "4");
+  });
+});
+
+describe("Lista zaposlenih - loading i error stanja", () => {
+  it("prikazuje loading dok se podaci ucitavaju", () => {
+    cy.loginBypass();
+    cy.intercept("GET", "**/api/employees?*", {
+      body: { employees: mockEmployees },
+      delay: 500,
+    }).as("getEmployeesSlow");
+    cy.visit("/employees");
+    cy.contains("Učitavanje...").should("be.visible");
+    cy.wait("@getEmployeesSlow");
+    cy.contains("Učitavanje...").should("not.exist");
+  });
+
+  it("prikazuje gresku kad API vrati error", () => {
+    cy.loginBypass();
+    cy.intercept("GET", "**/api/employees?*", {
+      statusCode: 500,
+      body: { error: "Internal Server Error" },
+    }).as("getEmployeesError");
+    cy.visit("/employees");
+    cy.wait("@getEmployeesError");
+    cy.get("p[style*='color']").should("be.visible");
   });
 });

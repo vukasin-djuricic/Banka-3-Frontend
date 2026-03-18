@@ -14,7 +14,19 @@ describe("Pregled zaposlenog", () => {
   });
 
   it("klik na zaposlenog otvara details", () => {
+    cy.intercept("GET", "**/api/employees?*", {
+      body: {
+        employees: [
+          {
+            id: 1, first_name: "Petar", last_name: "Petrović",
+            email: "petar@primer.rs", position: "Menadžer",
+            phone_number: "+381601234567", active: true,
+          },
+        ],
+      },
+    }).as("getEmployees");
     cy.visit("/employees");
+    cy.wait("@getEmployees");
     cy.get(".employee-row").first().find("td").first().click();
     cy.url().should("include", "/employees/1");
   });
