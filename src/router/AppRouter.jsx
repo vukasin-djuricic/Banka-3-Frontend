@@ -17,7 +17,7 @@ export default function AppRouter() {
 
         <Route path="/login" element={<LoginPage />} />
 
-        <Route path="/loans" element={<LoanOverview />} />
+        <Route path="/loans" element={<ProtectedRoute><LoanOverview /></ProtectedRoute>} />
         <Route path="/employees" element={<ProtectedRoute><EmployeesPage /></ProtectedRoute>} />
         <Route path="/employees/create" element={<ProtectedRoute><CreateEmployeePage /></ProtectedRoute>} />
         <Route path="/employees/edit/:id" element={<ProtectedRoute><EditEmployeePage /></ProtectedRoute>} />
