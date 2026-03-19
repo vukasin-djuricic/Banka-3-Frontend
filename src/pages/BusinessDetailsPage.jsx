@@ -1,19 +1,22 @@
 import { useEffect, useState } from "react";
-import "./AccountDetailsPage.css";
-import { getAccountDetails } from "../services/AccountService";
+import { useParams } from "react-router-dom";
+import "./BusinessDetailsPage.css";
+import { getAccountDetails } from "../services/BusinessService";
 
-const AccountDetailsPage = () => {
+const BusinessAccountDetailsPage = () => {
+  const { id } = useParams();
+
   const [account, setAccount] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchAccount();
-  }, []);
+  }, [id]);
 
   const fetchAccount = async () => {
     try {
-      const data = await getAccountDetails();
+      const data = await getAccountDetails(id);
       setAccount(data);
     } catch (err) {
       setError("Failed to load account data");
@@ -28,12 +31,11 @@ const AccountDetailsPage = () => {
   const formatDate = (date) =>
     new Date(date).toLocaleDateString("sr-RS");
 
-  if (loading) return <div className="account-loading">Loading...</div>;
-  if (error) return <div className="account-loading">{error}</div>;
+  if (loading) return <div className="business-loading">Loading...</div>;
+  if (error) return <div className="business-loading">{error}</div>;
 
   return (
-    <div className="account-container">
-      {/* HEADER */}
+    <div className="business-container">
       <div className="header">
         <div>
           <p className="welcome">Dobrodošli,</p>
@@ -42,7 +44,6 @@ const AccountDetailsPage = () => {
         <div className="bell">🔔</div>
       </div>
 
-      {/* BALANCE */}
       <div className="balance-card">
         <p>Ukupno stanje</p>
         <h2>{formatMoney(account.balance)} RSD</h2>
@@ -54,10 +55,7 @@ const AccountDetailsPage = () => {
         </div>
       </div>
 
-      {/* GRID SEKCIJE */}
       <div className="grid">
-
-        {/* COMPANY */}
         <div className="card">
           <h3>Firma</h3>
           <p><strong>{account.companyName}</strong></p>
@@ -65,21 +63,18 @@ const AccountDetailsPage = () => {
           <p>{account.address}</p>
         </div>
 
-        {/* OWNER */}
         <div className="card">
           <h3>Vlasnik</h3>
           <p>{account.ownerName}</p>
           <p>{account.ownerEmail}</p>
         </div>
-
       </div>
 
-      {/* TRANSAKCIJE */}
       <div className="card transactions">
         <h3>Poslednje transakcije</h3>
 
-        {account.transactions.map((t, i) => (
-          <div key={i} className="transaction">
+        {account.transactions?.map((t, i) => (
+          <div key={t.id || i} className="transaction">
             <div>
               <p className="desc">{t.description}</p>
               <span>{formatDate(t.date)}</span>
@@ -95,4 +90,4 @@ const AccountDetailsPage = () => {
   );
 };
 
-export default AccountDetailsPage;
+export default BusinessAccountDetailsPage;
