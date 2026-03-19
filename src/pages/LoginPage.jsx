@@ -47,8 +47,8 @@ export default function LoginPage() {
     }
   };
 
-  const handleForgotPassword = async () => {
-      navigate("/change-password");
+  const handleForgotPassword = () => {
+      navigate("/forgot-password");
   };
 
   return (
