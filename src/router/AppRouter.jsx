@@ -24,6 +24,7 @@ import CreateAccountPage from "../pages/CreateAccountPage.jsx";
 import ClientDashboardPage from "../pages/ClientDashboardPage.jsx";
 import ExchangePage from "../pages/ExchangePage.jsx";
 import PaymentPage from "../pages/PaymentPage.jsx";
+import TaxDashboardPage from "../pages/TaxDashboardPage.jsx";
 
 export default function AppRouter() {
   return (
@@ -58,6 +59,7 @@ export default function AppRouter() {
 
         <Route path="/accounts/:id" element={<ProtectedRoute requiredRole="client"><AccountDetailsPage /></ProtectedRoute>} />
         <Route path="/exchange" element={<ProtectedRoute requiredRole="client"><ExchangePage /></ProtectedRoute>} />
+        <Route path="/tax" element={<ProtectedRoute requiredRole="employee"><TaxDashboardPage /></ProtectedRoute>} />
 
       </Routes>
     </BrowserRouter>
