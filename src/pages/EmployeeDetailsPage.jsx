@@ -46,7 +46,6 @@ export default function EmployeeDetailsPage() {
   if (loading) {
     return (
       <div className="page-bg">
-        <img src="/bank-logo.png" alt="logo" className="bank-logo" />
         <MenuDropdown />
 
         <div className="profile-page">
@@ -61,7 +60,6 @@ export default function EmployeeDetailsPage() {
   if (pageError || !employee) {
     return (
       <div className="page-bg">
-        <img src="/bank-logo.png" alt="logo" className="bank-logo" />
         <MenuDropdown />
 
         <div className="profile-page">
@@ -77,7 +75,6 @@ export default function EmployeeDetailsPage() {
 
   return (
     <div className="page-bg">
-      <img src="/bank-logo.png" alt="logo" className="bank-logo" />
       <MenuDropdown />
 
       <div className="profile-page">

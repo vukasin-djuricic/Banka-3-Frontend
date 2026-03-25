@@ -128,7 +128,6 @@ export default function EditEmployeePage() {
   if (notFound) {
     return (
       <div className="page-bg">
-        <img src="/bank-logo.png" className="bank-logo" />
         <MenuDropdown />
 
         <div className="create-page">
@@ -142,7 +141,6 @@ export default function EditEmployeePage() {
 
   return (
     <div className="page-bg">
-      <img src="/bank-logo.png" className="bank-logo" />
       <MenuDropdown />
 
       <div className="create-page">

@@ -183,7 +183,6 @@ export default function CreateEmployeePage() {
       čist layout bez debug background-a i bez inline stilova
     */
     <div className="page-bg">
-      <img src="/bank-logo.png" alt="logo" className="bank-logo" />
       <MenuDropdown />
 
       <div className="create-page">

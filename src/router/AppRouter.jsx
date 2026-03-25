@@ -16,7 +16,6 @@ import ProtectedRoute from "./ProtectedRoute.jsx";
 import AdminLoansPage from "../pages/AdminLoansPage.jsx";
 import LoanApplicationPage from "../pages/LoanApplicationPage.jsx"
 import BusinessDetailsPage from "../pages/BusinessDetailsPage.jsx";
-import CreateBusinessAccountPage from "../pages/CreateBusinessAccountPage";
 import ForgotPasswordPage from "../pages/ForgotPasswordPage.jsx";
 import EnterTokenPage from "../pages/EnterTokenPage.jsx";
 import AccountDetailsPage from "../pages/AccountDetailsPage.jsx";

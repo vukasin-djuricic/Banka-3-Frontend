@@ -112,6 +112,8 @@ export default function AccountDetailsPage() {
 
                 {/* ── BALANCE CARD ── */}
                 <div className="ad-balance-card">
+                    <div className="dash-bc-circle1"/>
+                    <div className="dash-bc-circle2"/>
                     <p className="ad-account-number">{account.number}</p>
                     <p className="ad-balance-main">{fmt(account.balance, account.currency)}</p>
                     <div className="ad-balance-row">
