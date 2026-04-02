@@ -60,24 +60,40 @@ export default function CreateLoanRequestPage() {
       return;
     }
 
+    if (Number(period) === 0) {
+      setError("Molimo izaberite rok otplate.");
+      return;
+    }
+
     try {
       setLoading(true);
       
-      // Pronađi selektovani račun da bi znao valutu
       const accObj = accounts.find(a => a.account_number === selectedAccount);
+
+      const employmentStatusMap = {
+        "full_time": "full_time",
+        "part_time": "temporary",
+        "self_employed": "temporary",
+        "unemployed": "unemployed"
+      };
+
+      const interestRateTypeMap = {
+        "fixed": "FIKSNA",
+        "variable": "VARIJABILNA"
+      };
 
       await createLoanRequest({
         account_number: selectedAccount,
         amount: Number(amount),
-        period: Number(period),
+        repayment_period: Number(period),
         currency: accObj ? accObj.currency : "RSD",
         loan_type: loanType,
         salary: Number(salary),
-        employment_status: employmentStatus,
+        employment_status: employmentStatusMap[employmentStatus],
         employment_period: Number(employmentPeriod),
         phone_number: phoneNumber,
         purpose: purpose,
-        interest_rate_type: interestRateType,
+        interest_rate_type: interestRateTypeMap[interestRateType],
       });
 
       setSuccess("Zahtev za kredit je uspešno podnet.");
@@ -87,7 +103,6 @@ export default function CreateLoanRequestPage() {
       setLoanType("GOTOVINSKI");
       setInterestRateType("fixed");
     } catch (err) {
-      // Ako backend vrati 400, ispisaće tačnu grešku ovde
       const msg = err.response?.data?.details || err.response?.data?.message || "Greška 400: Proverite podatke.";
       setError(msg);
     } finally {

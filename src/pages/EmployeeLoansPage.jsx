@@ -1,3 +1,5 @@
+// AdminLoansPage.jsx
+
 import { useState, useEffect } from "react"
 import Sidebar from "../components/Sidebar.jsx";
 import { getLoanRequests, approveLoanRequest, rejectLoanRequest } from "../services/LoanService.js";
@@ -13,32 +15,26 @@ export default function AdminLoansPage(){
   const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
-    const loadLoans = async () => {
-      try {
-        const data = await getLoanRequests();
-        if (!cancelled) {
-          setLoans(data);
-          setError("");
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError("Greška pri učitavanju zahteva.");
-          console.error("Error loading loan requests:", err);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
     loadLoans();
-    return () => { cancelled = true; };
   }, []);
+
+  const loadLoans = async () => {
+    try {
+      setLoading(true);
+      const data = await getLoanRequests();
+      setLoans(data);
+      setError("");
+    } catch (err) {
+      setError("Greška pri učitavanju zahteva.");
+      console.error("Error loading loan requests:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredLoans = loans.filter(l => {
     if (filter === "ALL") return true;
-    return l.status === filter;
+    return l.status?.toLowerCase() === filter.toLowerCase();
   });
 
   const updateStatus = async (id, newStatus) => {
@@ -50,11 +46,8 @@ export default function AdminLoansPage(){
         await rejectLoanRequest(id);
       }
       
-      // Update local state
-      const updatedLoans = loans.map(l =>
-        l.id === id ? { ...l, status: newStatus } : l
-      );
-      setLoans(updatedLoans);
+      await loadLoans();
+      
       setSelected(null);
       setError("");
     } catch (err) {
@@ -96,26 +89,29 @@ export default function AdminLoansPage(){
                 <div
                   key={loan.id}
                   className="loan-card"
-                  onClick={() => setSelected(loan)}
+                  onClick={() => {
+  console.log("🟦 SELECTED LOAN RAW:", loan);
+  setSelected(loan);
+}}
                   style={{ cursor: "pointer" }}
                 >
-                  <div className={`loan-status ${loan.status}`}>
+                  <div className={`loan-status ${loan.status?.toLowerCase()}`}>
                     {loan.status}
                   </div>
 
                   <div className="loan-amount">
-                    {loan.amount} €
+                    {loan.loan_amount} {loan.currency}
                   </div>
 
                   <div className="loan-info">
                     <div>
-                      <span>Klijent</span>
-                      <strong>{loan.client}</strong>
+                      <span>Vrsta kredita</span>
+                      <strong>{loan.loan_type}</strong>
                     </div>
 
                     <div>
-                      <span>Period</span>
-                      <strong>{loan.period} meseci</strong>
+                      <span>Račun</span>
+                      <strong>{loan.account_number}</strong>
                     </div>
                   </div>
                 </div>
@@ -129,12 +125,20 @@ export default function AdminLoansPage(){
             <div className="loan-details">
               <h2>Detalji zahteva</h2>
 
-              <p><strong>Klijent:</strong> {selected.client}</p>
-              <p><strong>Iznos:</strong> {selected.amount} €</p>
-              <p><strong>Period:</strong> {selected.period} meseci</p>
+              <p><strong>Vrsta kredita:</strong> {selected.loan_type}</p>
+              <p><strong>Iznos:</strong> {selected.loan_amount} {selected.currency}</p>
+              <p><strong>Svrha:</strong> {selected.purpose}</p>
+              <p><strong>Period otplate:</strong> {selected.repayment_period} meseci</p>
+              <p><strong>Plata:</strong> {selected.salary}</p>
+              <p><strong>Status zaposlenja:</strong> {selected.employment_status}</p>
+              <p><strong>Staž:</strong> {selected.employment_period}</p>
+              <p><strong>Telefon:</strong> {selected.phone_number}</p>
+              <p><strong>Tip kamate:</strong> {selected.interest_rate_type}</p>
+              <p><strong>Račun:</strong> {selected.account_number}</p>
+              <p><strong>Datum podnošenja:</strong> {new Date(selected.submission_date).toLocaleDateString("sr-RS")}</p>
               <p><strong>Status:</strong> {selected.status}</p>
 
-              {selected.status === "PENDING" && (
+              {selected.status?.toLowerCase() === "pending" && (
                 <div className="loan-actions">
                   <button
                     className="loan-approve"

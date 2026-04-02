@@ -9,6 +9,7 @@ export default function EmployeeLoansListPage() {
   const [filteredLoans, setFilteredLoans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [selectedLoan, setSelectedLoan] = useState(null);
   
   const [filterLoanType, setFilterLoanType] = useState("");
   const [filterAccountNumber, setFilterAccountNumber] = useState("");
@@ -18,25 +19,28 @@ export default function EmployeeLoansListPage() {
     loadLoans();
   }, []);
 
-  const loadLoans = async () => {
-    try {
-      setLoading(true);
-      const data = await getLoans();
-      
-      const sorted = (Array.isArray(data) ? data : []).sort(
-        (a, b) => a.account_number.localeCompare(b.account_number)
-      );
-      
-      setAllLoans(sorted);
-      setFilteredLoans(sorted);
-      setError("");
-    } catch (err) {
-      setError("Greška pri učitavanju kredita.");
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+const loadLoans = async () => {
+  try {
+    setLoading(true);
+    const data = await getLoans();
+    
+    console.log("📋 Svi krediti sa backenda:", data);
+    console.log("🔴 Odbijeni krediti:", data?.filter(l => l.status?.toLowerCase() === "rejected"));
+    
+    const sorted = (Array.isArray(data) ? data : []).sort(
+      (a, b) => a.account_number.localeCompare(b.account_number)
+    );
+    
+    setAllLoans(sorted);
+    setFilteredLoans(sorted);
+    setError("");
+  } catch (err) {
+    setError("Greška pri učitavanju kredita.");
+    console.error(err);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleFilterChange = () => {
     let result = [...allLoans];
@@ -172,7 +176,11 @@ export default function EmployeeLoansListPage() {
             </thead>
             <tbody>
               {filteredLoans.map(loan => (
-                <tr key={loan.loan_number}>
+                <tr 
+                  key={loan.loan_number}
+                  onClick={() => setSelectedLoan(loan)}
+                  style={{ cursor: "pointer" }}
+                >
                   <td className="loan-number">{loan.loan_number}</td>
                   <td>{loan.loan_type}</td>
                   <td>{loan.interest_rate_type || "Fiksna"}</td>
@@ -193,6 +201,100 @@ export default function EmployeeLoansListPage() {
           </table>
         </div>
       )}
+
+      {selectedLoan && (
+        <LoanDetailModal
+          loan={selectedLoan}
+          onClose={() => setSelectedLoan(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function LoanDetailModal({ loan, onClose }) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={e => e.stopPropagation()}>
+        <button className="modal-close" onClick={onClose}>✕</button>
+
+        <h2>Detalji kredita</h2>
+
+        <div className="detail-grid">
+          <div className="detail-row">
+            <span className="detail-label">Broj kredita:</span>
+            <span className="detail-value">{loan.loan_number}</span>
+          </div>
+
+          <div className="detail-row">
+            <span className="detail-label">Vrsta kredita:</span>
+            <span className="detail-value">{loan.loan_type}</span>
+          </div>
+
+          <div className="detail-row">
+            <span className="detail-label">Ukupan iznos:</span>
+            <span className="detail-value">
+              {formatCurrency(loan.loan_amount, loan.currency)}
+            </span>
+          </div>
+
+          <div className="detail-row">
+            <span className="detail-label">Period otplate:</span>
+            <span className="detail-value">{loan.repayment_period} meseci</span>
+          </div>
+
+          <div className="detail-row">
+            <span className="detail-label">Nominalna kamatna stopa:</span>
+            <span className="detail-value">{loan.nominal_rate}%</span>
+          </div>
+
+          <div className="detail-row">
+            <span className="detail-label">Efektivna kamatna stopa:</span>
+            <span className="detail-value">{loan.effective_rate || loan.nominal_rate}%</span>
+          </div>
+
+          <div className="detail-row">
+            <span className="detail-label">Datum ugovaranja:</span>
+            <span className="detail-value">{formatDate(loan.agreement_date)}</span>
+          </div>
+
+          <div className="detail-row">
+            <span className="detail-label">Datum dospeća:</span>
+            <span className="detail-value">{formatDate(loan.maturity_date)}</span>
+          </div>
+
+          <div className="detail-row">
+            <span className="detail-label">Sledeća rata:</span>
+            <span className="detail-value">
+              {formatCurrency(loan.next_installment_amount, loan.currency)}
+            </span>
+          </div>
+
+          <div className="detail-row">
+            <span className="detail-label">Datum sledeće rate:</span>
+            <span className="detail-value">{formatDate(loan.next_installment_date)}</span>
+          </div>
+
+          <div className="detail-row">
+            <span className="detail-label">Preostalo dugovanje:</span>
+            <span className="detail-value">
+              {formatCurrency(loan.remaining_debt, loan.currency)}
+            </span>
+          </div>
+
+          <div className="detail-row">
+            <span className="detail-label">Valuta:</span>
+            <span className="detail-value">{loan.currency}</span>
+          </div>
+
+          <div className="detail-row">
+            <span className="detail-label">Status:</span>
+            <span className={`detail-status ${loan.status?.toLowerCase().replace(' ', '_')}`}>
+              {loan.status}
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
