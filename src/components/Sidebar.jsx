@@ -64,7 +64,7 @@ export default function MenuDropdown() {
           { title: "Menjačnica", items: [{ label: "Kursna lista / konverzija", path: "/exchange" }] },
           { title: "Kartice", items: [
               { label: "Moje kartice", path: "/cards" },
-              { label: "Zahtev za novu karticu", path: "/cards/request" },
+              { label: "Zahtev za novu karticu", path: "/cards?tab=create" },
             ]},
           { title: "Krediti", items: [
               { label: "Moji krediti", path: "/loans" },

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   getUserCards,
   getUserAccounts,
@@ -7,12 +8,12 @@ import {
 import { getCurrentUserEmail } from "../services/AuthService";
 import CardsList from "../components/cards/CardsList";
 import CreateCardForm from "../components/cards/CreateCardForm";
-import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar.jsx";
 import "./CardsPage.css";
 
 function CardsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [cards, setCards] = useState([]);
   const [accounts, setAccounts] = useState([]);
@@ -20,6 +21,19 @@ function CardsPage() {
 
   const [activeTab, setActiveTab] = useState("list");
   const [message, setMessage] = useState("");
+
+  const role = localStorage.getItem("userRole");
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get("tab");
+
+    if (tab === "create" && role === "client") {
+      setActiveTab("create");
+    } else {
+      setActiveTab("list");
+    }
+  }, [location.search, role]);
 
   useEffect(() => {
     const email = getCurrentUserEmail();
@@ -41,14 +55,7 @@ function CardsPage() {
         getUserAccounts()
       ]);
 
-      const filteredCards = cardsData.filter(card => {
-        const account = accountsData.find(
-          a => a.accountNumber === card.accountNumber
-        );
-        return account !== undefined;
-      });
-
-      setCards(filteredCards);
+      setCards(cardsData);
       setAccounts(accountsData);
     } catch (error) {
       setMessage("Greška pri učitavanju: " + error.message);
@@ -62,6 +69,7 @@ function CardsPage() {
       await requestCard(cardData);
       setMessage("Zahtev poslat. Proverite email za potvrdu.");
       setActiveTab("list");
+      navigate("/cards");
       await loadData();
     } catch (error) {
       setMessage("Greška: " + error.message);
@@ -88,7 +96,9 @@ function CardsPage() {
       <Sidebar />
 
       <div className="cards-container">
-        <h1>Moje kartice</h1>
+        <h1>
+          {activeTab === "list" ? "Moje kartice" : "Zahtev za karticu"}
+        </h1>
 
         {message && (
           <div className="message success">{message}</div>
@@ -97,17 +107,19 @@ function CardsPage() {
         <div className="tabs">
           <button
             className={`tab-btn ${activeTab === "list" ? "active" : ""}`}
-            onClick={() => setActiveTab("list")}
+            onClick={() => navigate("/cards")}
           >
             Sve kartice ({cards.length})
           </button>
 
-          <button
-            className={`tab-btn ${activeTab === "create" ? "active" : ""}`}
-            onClick={() => setActiveTab("create")}
-          >
-            Zatraži karticu
-          </button>
+          {role === "client" && (
+            <button
+              className={`tab-btn ${activeTab === "create" ? "active" : ""}`}
+              onClick={() => navigate("/cards?tab=create")}
+            >
+              Zatraži karticu
+            </button>
+          )}
         </div>
 
         {activeTab === "list" && (
@@ -118,7 +130,7 @@ function CardsPage() {
           />
         )}
 
-        {activeTab === "create" && (
+        {activeTab === "create" && role === "client" && (
           <CreateCardForm
             accounts={accounts}
             onSubmit={handleCardRequest}

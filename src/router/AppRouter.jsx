@@ -63,7 +63,7 @@ export default function AppRouter() {
           <Route path="/recipients" element={<ProtectedRoute requiredRole="client"><RecipientsPage /></ProtectedRoute>} />
           <Route path="/payments" element={<ProtectedRoute requiredRole="client"><PaymentsPage /></ProtectedRoute>} />
           <Route path="/accounts/business/:id" element={<ProtectedRoute><BusinessDetailsPage /></ProtectedRoute>}/>
-          <Route path="/cards" element={<ProtectedRoute requiredRole="client"><CardsPage /></ProtectedRoute>} />
+          <Route path="/cards" element={<ProtectedRoute><CardsPage /></ProtectedRoute>} />
           <Route path="/payment" element={<ProtectedRoute requiredRole="client"><PaymentPage /></ProtectedRoute>} />
           <Route path="/verify" element={<ProtectedRoute requiredRole="client"><TotpSetupPage /></ProtectedRoute>} />
           <Route path="/transfer" element={<ProtectedRoute requiredRole="client"><TransferPage /></ProtectedRoute>} />
