@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 export default function TotpModal({
     open = true,
@@ -8,27 +8,15 @@ export default function TotpModal({
     error: externalError = "",
 }) {
     const [digits, setDigits] = useState(["", "", "", "", "", ""]);
-    const [error, setError] = useState("");
+    const [internalError, setInternalError] = useState("");
     const inputs = useRef([]);
-
-    useEffect(() => {
-        if (!open) {
-            setDigits(["", "", "", "", "", ""]);
-            setError("");
-        }
-    }, [open]);
-
-    useEffect(() => {
-        if (externalError) {
-            setError(externalError);
-        }
-    }, [externalError]);
 
     const handleChange = (index, value) => {
         const digit = value.replace(/\D/g, "").slice(-1);
         const newDigits = [...digits];
         newDigits[index] = digit;
         setDigits(newDigits);
+        if (internalError) setInternalError("");
 
         // Auto-focus sledeće polje
         if (digit && index < 5) {
@@ -56,20 +44,21 @@ export default function TotpModal({
     const handleConfirm = async () => {
         const code = digits.join("");
         if (code.length !== 6) {
-            setError("Unesite svih 6 cifara.");
+            setInternalError("Unesite svih 6 cifara.");
             return;
         }
-        setError("");
+        setInternalError("");
         try {
             await onConfirm(code);
         } catch (err) {
-            setError(err.message || "Neispravan kod. Pokušajte ponovo.");
+            setInternalError(err.message || "Neispravan kod. Pokušajte ponovo.");
             setDigits(["", "", "", "", "", ""]);
             inputs.current[0]?.focus();
         }
     };
 
     const code = digits.join("");
+    const displayedError = externalError || internalError;
 
     if (!open) {
         return null;
@@ -125,7 +114,7 @@ export default function TotpModal({
                             style={{
                                 width: "48px", height: "56px",
                                 background: "#0f172a",
-                                border: `2px solid ${error ? "#ef4444" : digit ? "#3b82f6" : "#1e293b"}`,
+                                border: `2px solid ${displayedError ? "#ef4444" : digit ? "#3b82f6" : "#1e293b"}`,
                                 borderRadius: "10px",
                                 color: "#f1f5f9",
                                 fontSize: "1.4rem",
@@ -138,9 +127,9 @@ export default function TotpModal({
                     ))}
                 </div>
 
-                {error && (
+                {displayedError && (
                     <p className="totp-error" style={{ color: "#ef4444", fontSize: "0.85rem", textAlign: "center", marginBottom: "8px" }}>
-                        {error}
+                        {displayedError}
                     </p>
                 )}
 
