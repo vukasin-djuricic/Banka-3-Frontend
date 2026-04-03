@@ -18,36 +18,27 @@ export default function ClientsPage() {
     const [error, setError] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
     const [filterGender, setFilterGender] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
+    const PAGE_SIZE = 15;
 
     useEffect(() => {
         let cancelled = false;
-
         async function loadClients() {
             try {
                 const data = await getClients();
-                if (!cancelled) {
-                    setClients(data);
-                }
+                if (!cancelled) setClients(data);
             } catch {
-                if (!cancelled) {
-                    setError("Greška pri učitavanju klijenata.");
-                }
+                if (!cancelled) setError("Greška pri učitavanju klijenata.");
             } finally {
-                if (!cancelled) {
-                    setLoading(false);
-                }
+                if (!cancelled) setLoading(false);
             }
         }
-
         loadClients();
-        return () => {
-            cancelled = true;
-        };
+        return () => { cancelled = true; };
     }, []);
 
     const filteredClients = useMemo(() => {
         const term = searchTerm.trim().toLowerCase();
-
         return clients.filter((client) => {
             const matchesSearch =
                 !term ||
@@ -55,21 +46,25 @@ export default function ClientsPage() {
                 (client.email || "").toLowerCase().includes(term) ||
                 (client.phone || "").toLowerCase().includes(term) ||
                 String(client.id || "").includes(term);
-
             const matchesGender = !filterGender || client.gender === filterGender;
-
             return matchesSearch && matchesGender;
         });
     }, [clients, searchTerm, filterGender]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, filterGender]);
+
+    const totalPages = Math.ceil(filteredClients.length / PAGE_SIZE);
+    const startIndex = (currentPage - 1) * PAGE_SIZE;
+    const paginatedClients = filteredClients.slice(startIndex, startIndex + PAGE_SIZE);
 
     if (loading) {
         return (
             <div className="page-bg">
                 <img src="/bank-logo.png" alt="logo" className="bank-logo" />
                 <Sidebar />
-                <div className="content-wrapper">
-                    <p>Učitavanje...</p>
-                </div>
+                <div className="content-wrapper"><p>Učitavanje...</p></div>
             </div>
         );
     }
@@ -79,9 +74,7 @@ export default function ClientsPage() {
             <div className="page-bg">
                 <img src="/bank-logo.png" alt="logo" className="bank-logo" />
                 <Sidebar />
-                <div className="content-wrapper">
-                    <p style={{ color: "#f87171" }}>{error}</p>
-                </div>
+                <div className="content-wrapper"><p style={{ color: "#f87171" }}>{error}</p></div>
             </div>
         );
     }
@@ -90,16 +83,13 @@ export default function ClientsPage() {
         <div className="page-bg">
             <img src="/bank-logo.png" alt="logo" className="bank-logo" />
             <Sidebar />
-
             <div className="content-wrapper">
                 <div className="employee-card client-card-shell">
                     <div className="employee-topbar">
                         <div className="employee-title-block">
                             <p className="employee-eyebrow">UPRAVLJANJE KLIJENTIMA</p>
                             <h1>Klijenti</h1>
-                            <p className="employee-subtitle">
-                                Pregled, pretraga i otvaranje detalja klijenata banke.
-                            </p>
+                            <p className="employee-subtitle">Pregled, pretraga i otvaranje detalja klijenata banke.</p>
                         </div>
                     </div>
 
@@ -115,7 +105,6 @@ export default function ClientsPage() {
                                 />
                             </div>
                         </div>
-
                         <div className="toolbar-actions">
                             <select
                                 className="position-filter"
@@ -126,14 +115,7 @@ export default function ClientsPage() {
                                 <option value="M">Muški</option>
                                 <option value="F">Ženski</option>
                             </select>
-
-                            <button
-                                className="reset-btn"
-                                onClick={() => {
-                                    setSearchTerm("");
-                                    setFilterGender("");
-                                }}
-                            >
+                            <button className="reset-btn" onClick={() => { setSearchTerm(""); setFilterGender(""); }}>
                                 Reset filtera
                             </button>
                         </div>
@@ -156,19 +138,15 @@ export default function ClientsPage() {
                             </tr>
                             </thead>
                             <tbody>
-                            {filteredClients.length === 0 ? (
+                            {paginatedClients.length === 0 ? (
                                 <tr>
                                     <td colSpan={6} className="client-empty-state">
                                         Nema rezultata za zadate kriterijume.
                                     </td>
                                 </tr>
                             ) : (
-                                filteredClients.map((client) => (
-                                    <tr
-                                        key={client.id}
-                                        className="client-row"
-                                        onClick={() => navigate(`/clients/${client.id}`)}
-                                    >
+                                paginatedClients.map((client) => (
+                                    <tr key={client.id} className="client-row" onClick={() => navigate(`/clients/${client.id}`)}>
                                         <td>{client.id}</td>
                                         <td>{client.firstName} {client.lastName}</td>
                                         <td>{client.email || "—"}</td>
@@ -180,6 +158,16 @@ export default function ClientsPage() {
                             )}
                             </tbody>
                         </table>
+                    </div>
+
+                    <div className="pagination">
+                        <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>
+                            Prethodna
+                        </button>
+                        <span>Strana {currentPage} / {totalPages || 1}</span>
+                        <button disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(p => p + 1)}>
+                            Sledeća
+                        </button>
                     </div>
                 </div>
             </div>
