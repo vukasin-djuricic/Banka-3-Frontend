@@ -8,6 +8,7 @@ import Sidebar from "../components/Sidebar.jsx";
 function validate(form) {
   const errors = {};
 
+  if (!form.ime.trim()) errors.ime = "Ime je obavezno";
   if (!form.prezime.trim()) errors.prezime = "Prezime je obavezno.";
   if (!form.pol.trim()) errors.pol = "Pol je obavezan.";
 
@@ -29,6 +30,7 @@ export default function EditEmployeePage() {
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
+    ime: '',
     prezime: "",
     pol: "",
     telefon: "",
@@ -38,7 +40,6 @@ export default function EditEmployeePage() {
     aktivan: true,
   });
 
-  const [originalFirstName, setOriginalFirstName] = useState("");
   const [errors, setErrors] = useState({});
   const [successMsg, setSuccessMsg] = useState("");
   const [loading, setLoading] = useState(false);
@@ -47,8 +48,8 @@ export default function EditEmployeePage() {
   useEffect(() => {
     getEmployeeById(Number(id))
       .then((employee) => {
-        setOriginalFirstName(employee.firstName ?? "");
         setForm({
+          ime: employee.firstName ?? "",
           prezime: employee.lastName ?? "",
           pol: employee.gender ?? "",
           telefon: employee.phone ?? "",
@@ -87,7 +88,7 @@ export default function EditEmployeePage() {
 
     try {
       await updateEmployee(Number(id), {
-        firstName: originalFirstName,
+        firstName: form.ime,
         lastName: form.prezime,
         gender: form.pol,
         phoneNumber: form.telefon,
@@ -173,6 +174,7 @@ export default function EditEmployeePage() {
           <form onSubmit={handleSubmit} noValidate>
 
             <div style={{ marginBottom: "16px" }}>
+              {field("Ime", "ime")}
               {field("Prezime", "prezime")}
             </div>
 
@@ -194,18 +196,23 @@ export default function EditEmployeePage() {
             </div>
 
             <div className="form-group" style={{ marginBottom: "24px" }}>
-              <label className="checkbox-label">
-                Aktivan
-                <input
-                  type="checkbox"
-                  name="aktivan"
-                  checked={form.aktivan}
-                  onChange={handleChange}
-                />
-                <span className="checkbox-box">
-                  {form.aktivan ? "✓" : ""}
-                </span>
-              </label>
+              <div className="form-group" style={{ marginBottom: "24px" }}>
+                <label htmlFor="aktivan">Status naloga</label>
+                <select
+                    id="aktivan"
+                    name="aktivan"
+                    value={String(form.aktivan)}
+                    onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          aktivan: e.target.value === "true",
+                        }))
+                    }
+                >
+                  <option value="true">Aktivan</option>
+                  <option value="false">Neaktivan</option>
+                </select>
+              </div>
             </div>
 
             <div className="form-actions">

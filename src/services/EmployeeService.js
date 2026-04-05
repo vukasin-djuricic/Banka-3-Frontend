@@ -55,6 +55,7 @@ export async function createEmployee(data) {
 // 4. AZURIRANJE postojećeg zaposlenog
 export async function updateEmployee(id, data) {
   const response = await api.patch(`/employees/${id}`, {
+    first_name: data.firstName,
     last_name: data.lastName,
     gender: data.gender,
     phone: data.phoneNumber,
