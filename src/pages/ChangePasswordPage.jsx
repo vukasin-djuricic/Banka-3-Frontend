@@ -20,6 +20,7 @@ export default function ChangePasswordPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [tokenExpired, setTokenExpired] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -62,6 +63,14 @@ export default function ChangePasswordPage() {
       }, 2000);
 
     } catch (error) {
+      const status = error?.response?.status;
+      const message = error?.response?.data || "";
+
+      if (status === 400 && typeof message === "string" && message.toLowerCase().includes("expired")) {
+        setTokenExpired(true);
+        return;
+      }
+
       setSubmitError(
         error instanceof Error
           ? error.message
@@ -71,6 +80,43 @@ export default function ChangePasswordPage() {
       setSubmitting(false);
     }
   };
+
+  if (tokenExpired) {
+    return (
+      <div className="page-bg">
+        <Sidebar/>
+        <div className="cp-page">
+          <div className="cp-card">
+            <div className="cp-header">
+              <div className="cp-header-text">
+                <p className="cp-eyebrow">LINK ISTEKAO</p>
+                <h1 className="cp-title">Nevažeći link</h1>
+                <p className="cp-subtitle">
+                  Link za aktivaciju naloga je istekao ili je već iskorišćen. Zatražite novi link.
+                </p>
+              </div>
+            </div>
+            <div className="cp-actions">
+              <button
+                type="button"
+                className="cp-btn cp-btn-primary"
+                onClick={() => navigate("/forgot-password")}
+              >
+                Zatraži novi link
+              </button>
+              <button
+                type="button"
+                className="cp-btn cp-btn-secondary"
+                onClick={() => navigate("/login")}
+              >
+                Nazad na prijavu
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-bg">
