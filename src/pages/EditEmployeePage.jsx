@@ -8,6 +8,7 @@ import Sidebar from "../components/Sidebar.jsx";
 function validate(form) {
   const errors = {};
 
+  if (!form.ime.trim()) errors.ime = "Ime je obavezno";
   if (!form.prezime.trim()) errors.prezime = "Prezime je obavezno.";
   if (!form.pol.trim()) errors.pol = "Pol je obavezan.";
 
@@ -31,6 +32,7 @@ export default function EditEmployeePage() {
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
+    ime: '',
     prezime: "",
     pol: "",
     telefon: "",
@@ -63,6 +65,7 @@ export default function EditEmployeePage() {
         setOriginalFirstName(employee.firstName ?? "");
 
         setForm({
+          ime: employee.firstName ?? "",
           prezime: employee.lastName ?? "",
           pol: employee.gender ?? "",
           telefon: employee.phone ?? "",
@@ -116,7 +119,7 @@ export default function EditEmployeePage() {
       console.log("SALJEM:", selectedPermissions);
 
       await updateEmployee(Number(id), {
-        firstName: originalFirstName,
+        firstName: form.ime,
         lastName: form.prezime,
         gender: form.pol,
         phoneNumber: form.telefon,

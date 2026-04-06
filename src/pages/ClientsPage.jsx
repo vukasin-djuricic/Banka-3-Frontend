@@ -18,6 +18,8 @@ export default function ClientsPage() {
     const [error, setError] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
     const [filterGender, setFilterGender] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
+    const PAGE_SIZE = 15;
 
     useEffect(() => {
         let cancelled = false;
@@ -25,21 +27,16 @@ export default function ClientsPage() {
         async function loadClients() {
             try {
                 const data = await getClients();
-                if (!cancelled) {
-                    setClients(data);
-                }
+                if (!cancelled) setClients(data);
             } catch {
-                if (!cancelled) {
-                    setError("Greška pri učitavanju klijenata.");
-                }
+                if (!cancelled) setError("Greška pri učitavanju klijenata.");
             } finally {
-                if (!cancelled) {
-                    setLoading(false);
-                }
+                if (!cancelled) setLoading(false);
             }
         }
 
         loadClients();
+
         return () => {
             cancelled = true;
         };
@@ -62,14 +59,20 @@ export default function ClientsPage() {
         });
     }, [clients, searchTerm, filterGender]);
 
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, filterGender]);
+
+    const totalPages = Math.ceil(filteredClients.length / PAGE_SIZE);
+    const startIndex = (currentPage - 1) * PAGE_SIZE;
+    const paginatedClients = filteredClients.slice(startIndex, startIndex + PAGE_SIZE);
+
     if (loading) {
         return (
             <div className="page-bg">
                 <img src="/bank-logo.png" alt="logo" className="bank-logo" />
                 <Sidebar />
-                <div className="content-wrapper">
-                    <p>Učitavanje...</p>
-                </div>
+                <div className="content-wrapper"><p>Učitavanje...</p></div>
             </div>
         );
     }
@@ -79,9 +82,7 @@ export default function ClientsPage() {
             <div className="page-bg">
                 <img src="/bank-logo.png" alt="logo" className="bank-logo" />
                 <Sidebar />
-                <div className="content-wrapper">
-                    <p style={{ color: "#f87171" }}>{error}</p>
-                </div>
+                <div className="content-wrapper"><p style={{ color: "#f87171" }}>{error}</p></div>
             </div>
         );
     }
@@ -100,6 +101,24 @@ export default function ClientsPage() {
                             <p className="employee-subtitle">
                                 Pregled, pretraga i otvaranje detalja klijenata banke.
                             </p>
+                        </div>
+
+                        <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                            <button
+                                type="button"
+                                className="create-btn create-btn-secondary"
+                                onClick={() => navigate("/employees")}
+                            >
+                                Nazad
+                            </button>
+
+                            <button
+                                type="button"
+                                className="client-create-btn"
+                                onClick={() => navigate("/clients/create")}
+                            >
+                                + Kreiraj klijenta
+                            </button>
                         </div>
                     </div>
 
@@ -156,14 +175,14 @@ export default function ClientsPage() {
                             </tr>
                             </thead>
                             <tbody>
-                            {filteredClients.length === 0 ? (
+                            {paginatedClients.length === 0 ? (
                                 <tr>
                                     <td colSpan={6} className="client-empty-state">
                                         Nema rezultata za zadate kriterijume.
                                     </td>
                                 </tr>
                             ) : (
-                                filteredClients.map((client) => (
+                                paginatedClients.map((client) => (
                                     <tr
                                         key={client.id}
                                         className="client-row"
@@ -173,13 +192,32 @@ export default function ClientsPage() {
                                         <td>{client.firstName} {client.lastName}</td>
                                         <td>{client.email || "—"}</td>
                                         <td>{client.phone || "—"}</td>
-                                        <td>{client.gender === "M" ? "Muški" : client.gender === "F" ? "Ženski" : "—"}</td>
+                                        <td>
+                                            {client.gender === "M"
+                                                ? "Muški"
+                                                : client.gender === "F"
+                                                    ? "Ženski"
+                                                    : "—"}
+                                        </td>
                                         <td>{formatDate(client.dateOfBirth)}</td>
                                     </tr>
                                 ))
                             )}
                             </tbody>
                         </table>
+                    </div>
+
+                    <div className="pagination">
+                        <button disabled={currentPage === 1} onClick={() => setCurrentPage((p) => p - 1)}>
+                            Prethodna
+                        </button>
+                        <span>Strana {currentPage} / {totalPages || 1}</span>
+                        <button
+                            disabled={currentPage === totalPages || totalPages === 0}
+                            onClick={() => setCurrentPage((p) => p + 1)}
+                        >
+                            Sledeća
+                        </button>
                     </div>
                 </div>
             </div>
