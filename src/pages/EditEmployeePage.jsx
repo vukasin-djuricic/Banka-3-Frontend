@@ -4,6 +4,7 @@ import "./CreateEmployeePage.css";
 import "./EmployeesPage.css";
 import { getEmployeeById, updateEmployee } from "../services/EmployeeService";
 import Sidebar from "../components/Sidebar.jsx";
+import { useNavigate } from "react-router-dom";
 
 function validate(form) {
   const errors = {};
@@ -142,8 +143,12 @@ export default function EditEmployeePage() {
       <div className="create-page">
         <div className="create-form-card">
           {successMsg && <div className="success-msg">{successMsg}</div>}
-          {errors.submit && <div className="error-msg">{errors.submit}</div>}
 
+          {Object.keys(errors).length > 0 && (
+            <div className="error-msg">
+              {errors.submit || "Popunite sva obavezna polja"}
+            </div>
+          )}
           <form onSubmit={handleSubmit}>
             <div className="form-row-three">
               <div className="form-group">
