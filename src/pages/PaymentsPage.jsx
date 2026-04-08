@@ -261,9 +261,6 @@ const STATUS_CFG = {
     Odbijeno:     { color: "#f87171", bg: "rgba(248,113,113,0.12)", label: "Odbijeno", icon: (
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         )},
-    Odobreno:     { color: "#a78bfa", bg: "rgba(167,139,250,0.12)", label: "Odobreno", icon: (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-        )},
 };
 
 const FILTERS = [
@@ -271,7 +268,6 @@ const FILTERS = [
     { key: "Realizovano", label: "Izvršeno",  match: "Realizovano" },
     { key: "Na čekanju",  label: "U obradi",  match: "Na čekanju" },
     { key: "Odbijeno",    label: "Odbijeno",  match: "Odbijeno" },
-    { key: "Odobreno",    label: "Odobreno",  match: "Odobreno" },
 ];
 
 

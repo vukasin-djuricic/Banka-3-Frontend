@@ -70,11 +70,6 @@ describe("PaymentsPage - Filtriranje po Statusu", () => {
     cy.contains("button", "Odbijeno").click();
     cy.contains("button", "Odbijeno").should("have.class", "pp-filter-pill--active");
   });
-
-  it("aktivira filter kada se klikne na 'Odobreno'", () => {
-    cy.contains("button", "Odobreno").click();
-    cy.contains("button", "Odobreno").should("have.class", "pp-filter-pill--active");
-  });
 });
 
 describe("PaymentsPage - Filtriranje po Tipu", () => {

@@ -37,7 +37,6 @@ export async function getTransactions(filters = {}) {
   'completed': 'Realizovano',  // PRIVREMENO
   'pending': 'Na čekanju',
   'rejected': 'Odbijeno',
-  'approved': 'Odobreno',
 };
     
     const processedData = data.map(tx => ({
