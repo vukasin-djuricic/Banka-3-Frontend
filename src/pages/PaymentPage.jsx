@@ -185,7 +185,7 @@ export default function PaymentPage() {
                                     <option value="">-- Izaberite račun --</option>
                                     {accounts.map(acc => (
                                         <option key={acc.account_number} value={acc.account_number}>
-                                            {acc.account_number} - {acc.balance.toLocaleString("sr-RS")} RSD
+                                            {acc.account_number} - {acc.balance.toLocaleString("sr-RS")} {acc.currency || ""}
                                         </option>
                                     ))}
                                 </select>
@@ -249,7 +249,7 @@ export default function PaymentPage() {
                             <h3 className="pay-section-title">Detalji plaćanja</h3>
                             
                             <div className="pay-field">
-                                <label className="pay-label">Iznos (RSD)</label>
+                                <label className="pay-label">Iznos</label>
                                 <input 
                                     className={`pay-input ${errors.amount ? "pay-input--error" : ""}`} 
                                     name="amount" 
