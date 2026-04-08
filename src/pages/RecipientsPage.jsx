@@ -123,10 +123,16 @@ export default function RecipientsPage() {
       return;
     }
 
-    if (!trimmedAccount) {
-      setFormError("Broj računa je obavezan.");
-      return;
-    }
+      if (!trimmedAccount) {
+          setFormError("Broj računa je obavezan.");
+          return;
+      }
+
+      const accountRegex = /^\d{18}$/;
+      if (!accountRegex.test(trimmedAccount)) {
+          setFormError("Broj računa mora sadržati tačno 18 cifara.");
+          return;
+      }
 
     try {
       setFormLoading(true);

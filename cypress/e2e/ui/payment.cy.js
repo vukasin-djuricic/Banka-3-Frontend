@@ -12,7 +12,6 @@ describe("PaymentPage", () => {
 
   beforeEach(() => {
     cy.loginBypass();
-    // Mockujemo backend jer ga GitHub Actions ne pokreće
     cy.intercept("GET", "**/api/accounts", { statusCode: 200, body: mockAccounts }).as("getAccounts");
     cy.intercept("GET", "**/api/recipients", { statusCode: 200, body: [] }).as("getRecipients");
 
@@ -32,7 +31,6 @@ describe("PaymentPage", () => {
 
   it("prikazuje validacione greške za prazna polja", () => {
     cy.get(".pay-btn-submit").click();
-    // Umesto striktnog CSS selektora tražimo postojanje tekstova grešaka
     cy.contains("Izaberite vaš račun.").should("be.visible");
     cy.contains("Unesite račun primaoca.").should("be.visible");
     cy.contains("Unesite naziv primaoca.").should("be.visible");
@@ -43,7 +41,7 @@ describe("PaymentPage", () => {
 
   it("otvara TOTP modal nakon validnog submita", () => {
     cy.get('select[name="sender_account"]').select("265-0000000011234-56");
-    cy.get('input[name="recipient_account"]').type("265-0000000099876-12");
+    cy.get('input[name="recipient_account"]').type("265000000009987612");
     cy.get('input[name="recipient_name"]').type("Petar Nikolić");
     cy.get('input[name="amount"]').type("1000");
     cy.get('input[name="payment_code"]').type("289");
@@ -62,7 +60,7 @@ describe("PaymentPage", () => {
     }).as("paymentRequest");
 
     cy.get('select[name="sender_account"]').select("265-0000000011234-56");
-    cy.get('input[name="recipient_account"]').type("265-0000000099876-12");
+    cy.get('input[name="recipient_account"]').type("265000000009987612");
     cy.get('input[name="recipient_name"]').type("Petar Nikolić");
     cy.get('input[name="amount"]').type("1500");
     cy.get('input[name="payment_code"]').type("289");
@@ -79,7 +77,7 @@ describe("PaymentPage", () => {
 
       const body = interception.request.body;
       expect(body.sender_account).to.eq("265-0000000011234-56");
-      expect(body.recipient_account).to.eq("265-0000000099876-12");
+      expect(body.recipient_account).to.eq("265000000009987612");
       expect(body.amount).to.eq(1500);
     });
   });
@@ -91,7 +89,7 @@ describe("PaymentPage", () => {
     }).as("paymentRequest");
 
     cy.get('select[name="sender_account"]').select("265-0000000011234-56");
-    cy.get('input[name="recipient_account"]').type("265-0000000099876-12");
+    cy.get('input[name="recipient_account"]').type("265000000009987612");
     cy.get('input[name="recipient_name"]').type("Petar Nikolić");
     cy.get('input[name="amount"]').type("1000");
     cy.get('input[name="payment_code"]').type("289");
@@ -113,7 +111,7 @@ describe("PaymentPage", () => {
     }).as("paymentRequest");
 
     cy.get('select[name="sender_account"]').select("265-0000000011234-56");
-    cy.get('input[name="recipient_account"]').type("265-0000000099876-12");
+    cy.get('input[name="recipient_account"]').type("265000000009987612");
     cy.get('input[name="recipient_name"]').type("Petar Nikolić");
     cy.get('input[name="amount"]').type("1000");
     cy.get('input[name="payment_code"]').type("289");
@@ -130,7 +128,7 @@ describe("PaymentPage", () => {
 
   it("zatvara TOTP modal na Otkaži", () => {
     cy.get('select[name="sender_account"]').select("265-0000000011234-56");
-    cy.get('input[name="recipient_account"]').type("265-0000000099876-12");
+    cy.get('input[name="recipient_account"]').type("265000000009987612");
     cy.get('input[name="recipient_name"]').type("Petar Nikolić");
     cy.get('input[name="amount"]').type("1000");
     cy.get('input[name="payment_code"]').type("289");
@@ -141,6 +139,42 @@ describe("PaymentPage", () => {
 
     cy.get(".totp-btn-cancel").click();
     cy.get(".totp-overlay").should("not.exist");
+  });
+
+  it("prikazuje grešku za broj računa kraći od 18 cifara", () => {
+    cy.get('select[name="sender_account"]').select("265-0000000011234-56");
+    cy.get('input[name="recipient_account"]').type("12345");
+    cy.get('input[name="recipient_name"]').type("Petar Nikolić");
+    cy.get('input[name="amount"]').type("1000");
+    cy.get('input[name="payment_code"]').type("289");
+    cy.get('input[name="purpose"]').type("Test");
+
+    cy.get(".pay-btn-submit").click();
+    cy.contains("Broj računa mora sadržati tačno 18 cifara.").should("be.visible");
+  });
+
+  it("prikazuje grešku za broj računa sa slovima", () => {
+    cy.get('select[name="sender_account"]').select("265-0000000011234-56");
+    cy.get('input[name="recipient_account"]').type("abcdefghijklmnopqr");
+    cy.get('input[name="recipient_name"]').type("Petar Nikolić");
+    cy.get('input[name="amount"]').type("1000");
+    cy.get('input[name="payment_code"]').type("289");
+    cy.get('input[name="purpose"]').type("Test");
+
+    cy.get(".pay-btn-submit").click();
+    cy.contains("Broj računa mora sadržati tačno 18 cifara.").should("be.visible");
+  });
+
+  it("ne prikazuje grešku za ispravan 18-cifreni broj računa", () => {
+    cy.get('select[name="sender_account"]').select("265-0000000011234-56");
+    cy.get('input[name="recipient_account"]').type("265000000009987612");
+    cy.get('input[name="recipient_name"]').type("Petar Nikolić");
+    cy.get('input[name="amount"]').type("1000");
+    cy.get('input[name="payment_code"]').type("289");
+    cy.get('input[name="purpose"]').type("Test");
+
+    cy.get(".pay-btn-submit").click();
+    cy.get(".totp-overlay").should("be.visible");
   });
 });
 
