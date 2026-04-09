@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar.jsx";
 import { createClient } from "../services/ClientService";
+import { requestPasswordReset } from "../services/AuthService";
 import "./CreateClientPage.css";
 import "./EmployeesPage.css";
 
@@ -31,18 +32,6 @@ function validate(form) {
         errors.email = "Unesite ispravan email.";
     }
 
-    if (!form.password.trim()) {
-        errors.password = "Lozinka je obavezna.";
-    } else if (form.password.length < 8) {
-        errors.password = "Lozinka mora imati najmanje 8 karaktera.";
-    }
-
-    if (!form.confirmPassword.trim()) {
-        errors.confirmPassword = "Potvrda lozinke je obavezna.";
-    } else if (form.password !== form.confirmPassword) {
-        errors.confirmPassword = "Lozinke se ne poklapaju.";
-    }
-
     return errors;
 }
 
@@ -54,8 +43,6 @@ const EMPTY = {
     phoneNumber: "",
     address: "",
     dateOfBirth: "",
-    password: "",
-    confirmPassword: "",
 };
 
 export default function CreateClientPage() {
@@ -97,6 +84,7 @@ export default function CreateClientPage() {
         try {
             const [dd, mm, yyyy] = form.dateOfBirth.split(".");
             const formattedDate = `${yyyy}-${mm}-${dd}`;
+            let activationMailSent = true;
 
             await createClient({
                 firstName: form.firstName,
@@ -106,10 +94,19 @@ export default function CreateClientPage() {
                 phoneNumber: form.phoneNumber,
                 address: form.address,
                 dateOfBirth: formattedDate,
-                password: form.password,
             });
 
-            setSuccessMsg("Klijent je uspešno kreiran.");
+            try {
+                await requestPasswordReset(form.email);
+            } catch {
+                activationMailSent = false;
+            }
+
+            setSuccessMsg(
+                activationMailSent
+                    ? "Klijent je uspešno kreiran. Email za aktivaciju naloga je poslat."
+                    : "Klijent je uspešno kreiran, ali slanje aktivacionog email-a trenutno nije uspelo."
+            );
             setErrors({});
             setForm(EMPTY);
 
@@ -199,8 +196,6 @@ export default function CreateClientPage() {
                             {field("Broj telefona", "phoneNumber")}
                             {field("Adresa", "address")}
                             {field("Datum rođenja", "dateOfBirth", "text", "DD.MM.GGGG")}
-                            {field("Lozinka", "password", "password")}
-                            {field("Potvrda lozinke", "confirmPassword", "password")}
                         </div>
 
                         <div className="form-actions">

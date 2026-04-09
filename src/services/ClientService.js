@@ -85,7 +85,7 @@ export async function createClient(clientData) {
       ? Math.floor(new Date(clientData.dateOfBirth).getTime() / 1000)
       : 0;
 
-  const response = await api.post("/clients", {
+  const payload = {
     first_name: clientData.firstName.trim(),
     last_name: clientData.lastName.trim(),
     date_of_birth: birthTimestamp,
@@ -93,8 +93,14 @@ export async function createClient(clientData) {
     email: clientData.email.trim(),
     phone_number: clientData.phoneNumber.replace(/\D/g, ""),
     address: clientData.address.trim(),
-    password: clientData.password,
-  });
+  };
+
+  // Backward-compatible: only send password if explicitly provided.
+  if (clientData.password) {
+    payload.password = clientData.password;
+  }
+
+  const response = await api.post("/clients", payload);
 
   return response.data;
 }

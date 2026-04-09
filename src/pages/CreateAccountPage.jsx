@@ -4,6 +4,7 @@ import { createAccount } from "../services/AccountService";
 import Sidebar from "../components/Sidebar.jsx";
 import "./CreateAccountPage.css";
 import { getClients, getClientByEmail, createClient } from "../services/ClientService";
+import { requestPasswordReset } from "../services/AuthService";
 
 
 
@@ -85,7 +86,6 @@ const EMPTY_CLIENT = {
     address: "",
     gender: "",
     dateOfBirth: "",
-    password: "",
 };
 
 const PERSONAL_SUBTYPES = [
@@ -205,7 +205,6 @@ export default function CreateAccountPage() {
         if (!clientForm.address.trim()) errs.address = "Adresa je obavezna.";
         if (!clientForm.gender.trim()) errs.gender = "Pol je obavezan.";
         if (!clientForm.dateOfBirth.trim()) errs.dateOfBirth = "Datum rođenja je obavezan.";
-        if (!clientForm.password.trim()) errs.password = "Privremena lozinka je obavezna.";
 
         return errs;
     }
@@ -221,8 +220,15 @@ export default function CreateAccountPage() {
 
         try {
             setClientSubmitting(true);
+            let activationMailSent = true;
 
             await createClient(clientForm);
+
+            try {
+                await requestPasswordReset(clientForm.email);
+            } catch {
+                activationMailSent = false;
+            }
 
             const freshClients = await getClients();
             setClients(freshClients);
@@ -232,6 +238,13 @@ export default function CreateAccountPage() {
             if (createdClient?.id) {
                 setSelectedClientId(String(createdClient.id));
                 setErrors((prev) => ({ ...prev, client: "" }));
+            }
+
+            if (!activationMailSent) {
+                setClientFormErrors({
+                    submit: "Klijent je kreiran, ali aktivacioni email trenutno nije poslat.",
+                });
+                return;
             }
 
             closeClientModal();
@@ -872,19 +885,6 @@ export default function CreateAccountPage() {
                                         placeholder="Ulica i broj, grad"
                                     />
                                     {clientFormErrors.address && <p className="ca-error">{clientFormErrors.address}</p>}
-                                </div>
-
-                                <div className="ca-field">
-                                    <label className="ca-field-label">Privremena lozinka</label>
-                                    <input
-                                        className={`ca-input ${clientFormErrors.password ? "ca-input--error" : ""}`}
-                                        name="password"
-                                        type="password"
-                                        value={clientForm.password}
-                                        onChange={handleClientFormChange}
-                                        placeholder="Unesite privremenu lozinku"
-                                    />
-                                    {clientFormErrors.password && <p className="ca-error">{clientFormErrors.password}</p>}
                                 </div>
 
                                 {clientFormErrors.submit && (
