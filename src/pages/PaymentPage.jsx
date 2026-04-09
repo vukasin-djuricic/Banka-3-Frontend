@@ -180,9 +180,9 @@ export default function PaymentPage() {
 
         try {
             await createPayment(
-                { ...form, amount: Number(form.amount) },
-                totpCode
-            );
+    { ...form, amount: Math.round(Number(form.amount) * 100) },
+    totpCode
+);
 
             setShowTotp(false);
             setSuccessMsg("Plaćanje je uspešno izvršeno!");

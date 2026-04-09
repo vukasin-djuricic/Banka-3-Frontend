@@ -20,8 +20,13 @@ describe("PaymentPage", () => {
   });
 
   function popuniValidnuFormu() {
+<<<<<<< HEAD
     cy.get('select[name="sender_account"]').select("333000001123456789");
     cy.get('input[name="recipient_account"]').clear().type("333000009987654321");
+=======
+    cy.get('select[name="sender_account"]').select("265-0000000011234-56");
+    cy.get('input[name="recipient_account"]').clear().type("265000000009987612");
+>>>>>>> 2f8bc2c (fix: amount u parama i ispravni testovi)
     cy.get('input[name="recipient_name"]').clear().type("Petar Nikolić");
     cy.get('input[name="amount"]').clear().type("1000");
     cy.get('input[name="payment_code"]').clear().type("289");
@@ -85,10 +90,16 @@ describe("PaymentPage", () => {
       expect(interception.request.headers).to.have.property("totp", "123456");
 
       const body = interception.request.body;
+<<<<<<< HEAD
       expect(body.sender_account).to.eq("333000001123456789");
       expect(body.recipient_account).to.eq("333000009987654321");
       expect(body.recipient_name).to.eq("Petar Nikolić");
       expect(body.amount).to.eq(1500);
+=======
+      expect(body.sender_account).to.eq("265-0000000011234-56");
+      expect(body.recipient_account).to.eq("265000000009987612");
+      expect(body.amount).to.eq(150000);
+>>>>>>> 2f8bc2c (fix: amount u parama i ispravni testovi)
       expect(body.payment_code).to.eq("289");
       expect(body.reference_number).to.eq("97-12345678");
       expect(body.purpose).to.eq("Uplata za usluge");
