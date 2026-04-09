@@ -9,6 +9,11 @@ import useFailedAttempts, {
     BLOCKED_MESSAGE,
     MAX_FAILED_ATTEMPTS,
 } from "../utils/useFailedAttempts";
+import {
+    MAX_ACCOUNT_NUMBER_LENGTH,
+    isValidAccountNumber,
+    normalizeAccountNumberInput,
+} from "../utils/accountNumber.js";
 import "./PaymentPage.css";
 
 const EMPTY_FORM = {
@@ -65,7 +70,12 @@ export default function PaymentPage() {
 
     function handleChange(e) {
         const { name, value } = e.target;
-        setForm((prev) => ({ ...prev, [name]: value }));
+        const nextValue =
+            name === "recipient_account"
+                ? normalizeAccountNumberInput(value)
+                : value;
+
+        setForm((prev) => ({ ...prev, [name]: nextValue }));
 
         if (errors[name]) {
             setErrors((prev) => ({ ...prev, [name]: "" }));
@@ -131,6 +141,10 @@ export default function PaymentPage() {
             errs.recipient_account = "Broj računa mora sadržati tačno 18 cifara.";
         }
 
+        if (!form.recipient_account) errs.recipient_account = "Unesite račun primaoca.";
+        else if (!isValidAccountNumber(form.recipient_account)) {
+            errs.recipient_account = "Broj računa može imati najviše 20 cifara.";
+        }
         if (!form.recipient_name) errs.recipient_name = "Unesite naziv primaoca.";
         if (!form.amount || isNaN(form.amount) || Number(form.amount) <= 0) {
             errs.amount = "Unesite ispravan iznos.";
@@ -278,7 +292,9 @@ export default function PaymentPage() {
                                     name="recipient_account"
                                     value={form.recipient_account}
                                     onChange={handleChange}
-                                    placeholder="npr. 160-0000000000000-00"
+                                    placeholder="npr. 333000112345678910"
+                                    inputMode="numeric"
+                                    maxLength={MAX_ACCOUNT_NUMBER_LENGTH}
                                 />
                                 {errors.recipient_account && (
                                     <p className="pay-error-text">{errors.recipient_account}</p>

@@ -1,4 +1,8 @@
 import axios from "axios";
+// Cirkularni import: AuthService.js → api.js → AuthService.js. Radi jer se
+// clearAuthState i getIsLoggingOut koriste SAMO unutar interceptor funkcija,
+// koje se izvršavaju tek posle što su svi moduli završili load (live bindings).
+import { clearAuthState, getIsLoggingOut } from "./AuthService.js";
 
 const baseURL = import.meta.env.VITE_API_URL
   ? import.meta.env.VITE_API_URL
@@ -28,12 +32,16 @@ api.interceptors.response.use(
     ) {
       originalRequest._retry = true;
 
+      // Ako je logout u toku, ne pokušavaj refresh — in-flight request bi
+      // inače upisao nove tokene u sessionStorage POSLE čišćenja (M1).
+      if (getIsLoggingOut()) {
+        return Promise.reject(error);
+      }
+
       const storedRefresh = sessionStorage.getItem("refreshToken");
       if (!storedRefresh) {
-        sessionStorage.removeItem("accessToken");
-        sessionStorage.removeItem("refreshToken");
-        sessionStorage.removeItem("userId");
-        sessionStorage.removeItem("userRole");
+        clearAuthState();
+        sessionStorage.setItem("sessionExpired", "1");
         window.location.href = "/login";
         return Promise.reject(error);
       }
@@ -42,6 +50,10 @@ api.interceptors.response.use(
         const { data } = await api.post("/token/refresh", {
           refresh_token: storedRefresh,
         });
+        // Drugi put proveravamo flag — logout se mogao desiti tokom await-a.
+        if (getIsLoggingOut()) {
+          return Promise.reject(error);
+        }
         const newAccess = data.access_token || data.accessToken;
         const newRefresh = data.refresh_token || data.refreshToken;
         sessionStorage.setItem("accessToken", newAccess);
@@ -49,10 +61,8 @@ api.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${newAccess}`;
         return api(originalRequest);
       } catch {
-        sessionStorage.removeItem("accessToken");
-        sessionStorage.removeItem("refreshToken");
-        sessionStorage.removeItem("userId");
-        sessionStorage.removeItem("userRole");
+        clearAuthState();
+        sessionStorage.setItem("sessionExpired", "1");
         window.location.href = "/login";
         return Promise.reject(error);
       }

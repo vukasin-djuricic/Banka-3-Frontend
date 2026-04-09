@@ -1,4 +1,8 @@
 import api from "./api.js";
+import {
+  normalizeAccountNumberInput,
+  stringifyAccountNumber,
+} from "../utils/accountNumber.js";
 
 export async function getUserCards() {
   const response = await api.get("/cards");
@@ -11,7 +15,7 @@ export async function getUserCards() {
     status: card.status === "active" ? "Aktivna" : "Blokirana",
     expiryDate: card.expiration_date,
     cvv: card.cvv,
-    accountNumber: card.account_number,
+    accountNumber: stringifyAccountNumber(card.account_number),
     limit: card.limit || 0,
   }));
 }
@@ -20,8 +24,8 @@ export async function getUserAccounts() {
   const response = await api.get("/accounts");
 
   return (response.data || []).map(acc => ({
-    id: acc.account_number,
-    accountNumber: acc.account_number,
+    id: stringifyAccountNumber(acc.account_number),
+    accountNumber: stringifyAccountNumber(acc.account_number),
     accountName: acc.account_name,
     currency: acc.currency,
     balance: acc.balance,
@@ -32,7 +36,7 @@ export async function getUserAccounts() {
 
 export async function requestCard(cardData) {
   const response = await api.post("/cards", {
-    account_number: cardData.accountNumber,
+    account_number: normalizeAccountNumberInput(cardData.accountNumber),
 
     card_type: "DEBIT",
     card_brand: "VISA",

@@ -31,7 +31,7 @@ describe("Recipients API integracija", () => {
         method: "POST",
         url: "/api/recipients",
         headers: { Authorization: `Bearer ${accessToken}` },
-        body: { name, account_number: "265-0000000099999-01" },
+        body: { name, account_number: "333000009999900001" },
       }).then((resp) => {
         expect(resp.status).to.be.oneOf([200, 201]);
       });
@@ -45,7 +45,7 @@ describe("Recipients API integracija", () => {
         method: "POST",
         url: "/api/recipients",
         headers: { Authorization: `Bearer ${accessToken}` },
-        body: { name, account_number: "265-0000000088888-01" },
+        body: { name, account_number: "333000008888800001" },
       }).then(() => {
         cy.request({
           method: "GET",
@@ -58,7 +58,7 @@ describe("Recipients API integracija", () => {
               method: "PUT",
               url: `/api/recipients/${recipient.id}`,
               headers: { Authorization: `Bearer ${accessToken}` },
-              body: { name: `${name}-updated`, account_number: "265-0000000088888-01" },
+              body: { name: `${name}-updated`, account_number: "333000008888800001" },
               failOnStatusCode: false,
             }).then((updateResp) => {
               expect(updateResp.status).to.be.oneOf([200, 204]);
@@ -76,7 +76,7 @@ describe("Recipients API integracija", () => {
         method: "POST",
         url: "/api/recipients",
         headers: { Authorization: `Bearer ${accessToken}` },
-        body: { name, account_number: "265-0000000077777-01" },
+        body: { name, account_number: "333000007777700001" },
       }).then(() => {
         cy.request({
           method: "GET",

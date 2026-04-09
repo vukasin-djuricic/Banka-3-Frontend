@@ -1,7 +1,7 @@
 describe("Blokiranje TOTP nakon 3 neuspela pokušaja (#150)", () => {
   const mockAccounts = [
     {
-      account_number: "265-0000000011234-56",
+      account_number: "333000001123456789",
       account_name: "Tekući račun",
       balance: 50000,
       currency: "RSD",
@@ -17,8 +17,8 @@ describe("Blokiranje TOTP nakon 3 neuspela pokušaja (#150)", () => {
   }
 
   function popuniIPosaljiFormu() {
-    cy.get('select[name="sender_account"]').select("265-0000000011234-56");
-    cy.get('input[name="recipient_account"]').type("265-0000000099876-12");
+    cy.get('select[name="sender_account"]').select("333000001123456789");
+    cy.get('input[name="recipient_account"]').type("333000009987654321");
     cy.get('input[name="recipient_name"]').type("Petar Nikolić");
     cy.get('input[name="amount"]').type("1000");
     cy.get('input[name="payment_code"]').type("289");

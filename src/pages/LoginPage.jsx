@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { login } from "../services/AuthService";
+import { useState, useEffect } from "react";
+import { login, clearAuthState } from "../services/AuthService";
 import useFailedAttempts, { BLOCKED_MESSAGE } from "../utils/useFailedAttempts";
 import "./LoginPage.css";
 import { useNavigate } from "react-router-dom";
@@ -12,6 +12,13 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const { isBlocked, increment, reset } = useFailedAttempts("login");
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    if (sessionStorage.getItem("sessionExpired")) {
+      setMessage("Vaša sesija je istekla, molimo prijavite se ponovo.");
+      sessionStorage.removeItem("sessionExpired");
+    }
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -30,36 +37,46 @@ export default function LoginPage() {
     setMessage("");
 
     try {
-      // 1. Prvo radimo login da dobijemo tokene
       const data = await login(email, password);
       reset();
 
-      // 2. OBAVEZNO upisujemo tokene odmah, jer sledeći API pozivi 
-      // u ClientService/EmployeeService koriste ove tokene iz sessionStorage
       sessionStorage.setItem("accessToken", data.accessToken);
       sessionStorage.setItem("refreshToken", data.refreshToken);
       sessionStorage.setItem("permissions", JSON.stringify(data.permissions));
-
-      // 3. Utvrđujemo ulogu (Role Detection)
-      // Pošto backend ne vraća ulogu u login odgovoru, proveravamo bazu klijenata
-      sessionStorage.setItem("permissions", JSON.stringify(data.permissions));
       const permissions = data.permissions || [];
 
-      if (permissions.includes("admin")) {
-        sessionStorage.setItem("userRole", "employee");  // admin JE employee
-        navigate("/employees");
-      } else if (permissions.length > 0) {
+      if (permissions.includes("admin") || permissions.length > 0) {
         sessionStorage.setItem("userRole", "employee");
         navigate("/employees");
       } else {
         sessionStorage.setItem("userRole", "client");
         navigate("/dashboard");
       }
-
     } catch (err) {
       console.error("Login error:", err);
+
       if (err.response) {
-        if (err.response.status === 401) {
+        const status = err.response.status;
+        const serverMsg = err.response.data;
+        const serverMsgText =
+          typeof serverMsg === "string"
+            ? serverMsg
+            : serverMsg?.error || serverMsg?.message || "";
+        const normalized = String(serverMsgText).toLowerCase();
+
+        if (
+          status === 403 &&
+          (normalized.includes("activate") ||
+            normalized.includes("aktiv") ||
+            normalized.includes("set password") ||
+            normalized.includes("password") ||
+            normalized.includes("expired") ||
+            normalized.includes("inactive"))
+        ) {
+          setMessage(
+            "Nalog još nije aktiviran. Proverite email i postavite lozinku putem linka za aktivaciju (ili zatražite novi link)."
+          );
+        } else if (status === 401) {
           increment();
           setMessage("Pogrešan email ili lozinka");
         } else {
@@ -68,10 +85,7 @@ export default function LoginPage() {
       } else {
         setMessage("Mrežna greška. Proverite da li je Backend pokrenut.");
       }
-      sessionStorage.removeItem("accessToken");
-      sessionStorage.removeItem("refreshToken");
-      sessionStorage.removeItem("userId");
-      sessionStorage.removeItem("userRole");
+      clearAuthState();
     } finally {
       setLoading(false);
     }

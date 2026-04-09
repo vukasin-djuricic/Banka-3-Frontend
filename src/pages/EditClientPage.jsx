@@ -1,8 +1,7 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import Sidebar from "../components/Sidebar.jsx";
-import { createClient } from "../services/ClientService";
-import { requestPasswordReset } from "../services/AuthService";
+import { getClientById, updateClient } from "../services/ClientService";
 import "./CreateClientPage.css";
 import "./EmployeesPage.css";
 
@@ -35,37 +34,78 @@ function validate(form) {
     return errors;
 }
 
-const EMPTY = {
-    firstName: "",
-    lastName: "",
-    gender: "",
-    email: "",
-    phoneNumber: "",
-    address: "",
-    dateOfBirth: "",
-};
+function formatDateForInput(value) {
+    if (!value) return "";
+    const d = new Date(typeof value === "number" ? value * 1000 : value);
+    if (Number.isNaN(d.getTime())) return "";
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = d.getFullYear();
+    return `${day}.${month}.${year}`;
+}
 
-export default function CreateClientPage() {
+export default function EditClientPage() {
+    const { id } = useParams();
     const navigate = useNavigate();
 
-    const [form, setForm] = useState(EMPTY);
+    const [form, setForm] = useState({
+        firstName: "",
+        lastName: "",
+        gender: "",
+        email: "",
+        phoneNumber: "",
+        address: "",
+        dateOfBirth: "",
+    });
+
     const [errors, setErrors] = useState({});
     const [successMsg, setSuccessMsg] = useState("");
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [notFound, setNotFound] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function loadClient() {
+            try {
+                const client = await getClientById(id);
+
+                if (!client) {
+                    if (!cancelled) setNotFound(true);
+                    return;
+                }
+
+                if (!cancelled) {
+                    setForm({
+                        firstName: client.firstName || "",
+                        lastName: client.lastName || "",
+                        gender: client.gender || "",
+                        email: client.email || "",
+                        phoneNumber: client.phone || "",
+                        address: client.address || "",
+                        dateOfBirth: formatDateForInput(client.dateOfBirth),
+                    });
+                }
+            } catch {
+                if (!cancelled) setNotFound(true);
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        }
+
+        loadClient();
+        return () => {
+            cancelled = true;
+        };
+    }, [id]);
 
     function handleChange(e) {
         const { name, value } = e.target;
-
-        setForm((prev) => ({
-            ...prev,
-            [name]: value,
-        }));
+        setForm((prev) => ({ ...prev, [name]: value }));
 
         if (errors[name]) {
-            setErrors((prev) => ({
-                ...prev,
-                [name]: "",
-            }));
+            setErrors((prev) => ({ ...prev, [name]: "" }));
         }
     }
 
@@ -79,14 +119,13 @@ export default function CreateClientPage() {
             return;
         }
 
-        setLoading(true);
+        setSaving(true);
 
         try {
             const [dd, mm, yyyy] = form.dateOfBirth.split(".");
             const formattedDate = `${yyyy}-${mm}-${dd}`;
-            let activationMailSent = true;
 
-            await createClient({
+            await updateClient(Number(id), {
                 firstName: form.firstName,
                 lastName: form.lastName,
                 gender: form.gender,
@@ -96,29 +135,14 @@ export default function CreateClientPage() {
                 dateOfBirth: formattedDate,
             });
 
-            try {
-                await requestPasswordReset(form.email);
-            } catch {
-                activationMailSent = false;
-            }
-
-            setSuccessMsg(
-                activationMailSent
-                    ? "Klijent je uspešno kreiran. Email za aktivaciju naloga je poslat."
-                    : "Klijent je uspešno kreiran, ali slanje aktivacionog email-a trenutno nije uspelo."
-            );
             setErrors({});
-            setForm(EMPTY);
-
-            setTimeout(() => {
-                navigate("/clients");
-            }, 900);
+            setSuccessMsg("Podaci klijenta su uspešno izmenjeni.");
         } catch (err) {
             setErrors({
-                submit: err.response?.data?.error || "Greška pri kreiranju klijenta.",
+                submit: err.response?.data?.error || "Greška pri izmeni klijenta.",
             });
         } finally {
-            setLoading(false);
+            setSaving(false);
         }
     }
 
@@ -140,6 +164,32 @@ export default function CreateClientPage() {
         );
     }
 
+    if (loading) {
+        return (
+            <div className="page-bg">
+                <Sidebar />
+                <div className="create-page">
+                    <div className="create-form-card">
+                        <p>Učitavanje...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (notFound) {
+        return (
+            <div className="page-bg">
+                <Sidebar />
+                <div className="create-page">
+                    <div className="create-form-card">
+                        <p className="submit-error">Klijent nije pronađen.</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="page-bg">
             <Sidebar />
@@ -148,10 +198,10 @@ export default function CreateClientPage() {
                 <div className="create-form-card">
                     <div className="create-header">
                         <div className="create-header-text">
-                            <p className="create-eyebrow">KREIRANJE KLIJENTA</p>
-                            <h1>Kreiraj novog klijenta</h1>
+                            <p className="create-eyebrow">IZMENA KLIJENTA</p>
+                            <h1>Izmeni klijenta</h1>
                             <p className="create-subtitle">
-                                Unesite osnovne lične i kontakt podatke klijenta nezavisno od otvaranja računa.
+                                Ažuriranje ličnih podataka i kontakt informacija klijenta.
                             </p>
                         </div>
 
@@ -159,7 +209,7 @@ export default function CreateClientPage() {
                             <button
                                 type="button"
                                 className="create-btn create-btn-secondary"
-                                onClick={() => navigate("/clients")}
+                                onClick={() => navigate(`/clients/${id}`)}
                             >
                                 Nazad
                             </button>
@@ -202,9 +252,9 @@ export default function CreateClientPage() {
                             <button
                                 className="create-btn create-btn-primary"
                                 type="submit"
-                                disabled={loading}
+                                disabled={saving}
                             >
-                                {loading ? "Slanje..." : "Potvrdi"}
+                                {saving ? "Čuvanje..." : "Sačuvaj izmene"}
                             </button>
                         </div>
                     </form>

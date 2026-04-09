@@ -1,7 +1,7 @@
 describe("PaymentPage", () => {
   const mockAccounts = [
     {
-      account_number: "265-0000000011234-56",
+      account_number: "333000001123456789",
       account_name: "Tekući račun",
       balance: 50000,
       currency: "RSD",
@@ -20,8 +20,8 @@ describe("PaymentPage", () => {
   });
 
   function popuniValidnuFormu() {
-    cy.get('select[name="sender_account"]').select("265-0000000011234-56");
-    cy.get('input[name="recipient_account"]').clear().type("265-0000000099876-12");
+    cy.get('select[name="sender_account"]').select("333000001123456789");
+    cy.get('input[name="recipient_account"]').clear().type("333000009987654321");
     cy.get('input[name="recipient_name"]').clear().type("Petar Nikolić");
     cy.get('input[name="amount"]').clear().type("1000");
     cy.get('input[name="payment_code"]').clear().type("289");

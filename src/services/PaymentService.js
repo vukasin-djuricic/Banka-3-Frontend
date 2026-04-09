@@ -1,8 +1,20 @@
 import api from "./api.js";
+import {
+  normalizeAccountNumberInput,
+  stringifyAccountNumber,
+} from "../utils/accountNumber.js";
+
+function mapRecipient(recipient) {
+  if (!recipient || typeof recipient !== "object") return recipient;
+  return {
+    ...recipient,
+    account_number: stringifyAccountNumber(recipient.account_number),
+  };
+}
 
 export async function getRecipients() {
   const response = await api.get("/recipients");
-  return response.data;
+  return Array.isArray(response.data) ? response.data.map(mapRecipient) : response.data;
 }
 
 export async function getTransactions(filters = {}) {
@@ -63,13 +75,21 @@ export function fromCents(amount) {
 }
 
 export async function createRecipient(recipientData) {
-  const response = await api.post("/recipients", recipientData);
-  return response.data;
+  const payload = {
+    ...recipientData,
+    account_number: normalizeAccountNumberInput(recipientData.account_number),
+  };
+  const response = await api.post("/recipients", payload);
+  return mapRecipient(response.data);
 }
 
 export async function updateRecipient(id, recipientData) {
-  const response = await api.put(`/recipients/${id}`, recipientData);
-  return response.data;
+  const payload = {
+    ...recipientData,
+    account_number: normalizeAccountNumberInput(recipientData.account_number),
+  };
+  const response = await api.put(`/recipients/${id}`, payload);
+  return mapRecipient(response.data);
 }
 
 export async function deleteRecipient(id) {
@@ -79,13 +99,23 @@ export async function deleteRecipient(id) {
 
 export async function createPayment(paymentData, totpCode) {
   const config = totpCode ? { headers: { TOTP: totpCode } } : {};
-  const response = await api.post("/transactions/payment", paymentData, config);
+  const payload = {
+    ...paymentData,
+    sender_account: stringifyAccountNumber(paymentData.sender_account),
+    recipient_account: normalizeAccountNumberInput(paymentData.recipient_account),
+  };
+  const response = await api.post("/transactions/payment", payload, config);
   return response.data;
 }
 
 export async function createTransfer(transferData, totpCode) {
   const config = totpCode ? { headers: { TOTP: totpCode } } : {};
-  const response = await api.post("/transactions/transfer", transferData, config);
+  const payload = {
+    ...transferData,
+    from_account: stringifyAccountNumber(transferData.from_account),
+    to_account: stringifyAccountNumber(transferData.to_account),
+  };
+  const response = await api.post("/transactions/transfer", payload, config);
   return response.data;
 }
 

@@ -30,7 +30,7 @@ function CardsPage() {
   }, [location.search, role]);
 
   useEffect(() => {
-    const token = localStorage.getItem("accessToken");
+    const token = sessionStorage.getItem("accessToken");
 
     if (!token) {
       navigate("/login");

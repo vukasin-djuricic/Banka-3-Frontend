@@ -1,9 +1,27 @@
 import api from "./api.js";
 import { clearClientCache } from "./ClientService.js";
 
+// Module-level flag koji signalizira axios interceptoru da je logout u toku.
+// Sprečava race condition: in-flight 401 → refresh → upis novih tokena u
+// sessionStorage POSLE što je logout već obrisao stanje (M1 iz audit-a #162).
+let isLoggingOut = false;
+export const getIsLoggingOut = () => isLoggingOut;
+
+// Centralno brisanje svih auth tragova (sessionStorage + in-memory cache).
+// Koristi se iz svakog izlaznog puta: logout, api.js interceptor (istek),
+// Sidebar fallback, LoginPage error handler.
+export const clearAuthState = () => {
+  sessionStorage.removeItem("accessToken");
+  sessionStorage.removeItem("refreshToken");
+  sessionStorage.removeItem("userId");
+  sessionStorage.removeItem("userRole");
+  sessionStorage.removeItem("permissions");
+  clearClientCache();
+};
+
 export const login = async (email, password) => {
   const response = await api.post("/login", { email, password });
-  
+
   return {
     accessToken: response.data.accessToken || response.data.access_token,
     refreshToken: response.data.refreshToken || response.data.refresh_token,
@@ -13,13 +31,16 @@ export const login = async (email, password) => {
 };
 
 export const logout = async () => {
-  await api.post("/logout");
-  sessionStorage.removeItem("accessToken");
-  sessionStorage.removeItem("refreshToken");
-  sessionStorage.removeItem("userId");
-  sessionStorage.removeItem("userRole");
-  sessionStorage.removeItem("permissions");
-  clearClientCache();
+  isLoggingOut = true;
+  try {
+    await api.post("/logout");
+  } catch {
+    // Ignorišemo grešku — backend revocation je best-effort. Čišćenje lokalnog
+    // stanja u finally bloku je obavezno čak i ako server padne (H2).
+  } finally {
+    clearAuthState();
+    isLoggingOut = false;
+  }
 };
 
 export const refreshToken = async (refreshToken) => {
