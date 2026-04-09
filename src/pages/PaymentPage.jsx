@@ -135,12 +135,16 @@ export default function PaymentPage() {
 
     function validate() {
         const errs = {};
+        const accountRegex = /^\d{18}$/;
 
         if (!form.sender_account) errs.sender_account = "Izaberite vaš račun.";
-        if (!form.recipient_account) errs.recipient_account = "Unesite račun primaoca.";
-        else if (!isValidAccountNumber(form.recipient_account)) {
-            errs.recipient_account = "Broj računa može imati najviše 20 cifara.";
+
+        if (!form.recipient_account) {
+            errs.recipient_account = "Unesite račun primaoca.";
+        } else if (!accountRegex.test(form.recipient_account)) {
+            errs.recipient_account = "Broj računa mora sadržati tačno 18 cifara.";
         }
+
         if (!form.recipient_name) errs.recipient_name = "Unesite naziv primaoca.";
         if (!form.amount || isNaN(form.amount) || Number(form.amount) <= 0) {
             errs.amount = "Unesite ispravan iznos.";
@@ -176,9 +180,9 @@ export default function PaymentPage() {
 
         try {
             await createPayment(
-                { ...form, amount: Number(form.amount) },
-                totpCode
-            );
+    { ...form, amount: Math.round(Number(form.amount) * 100) },
+    totpCode
+);
 
             setShowTotp(false);
             setSuccessMsg("Plaćanje je uspešno izvršeno!");
