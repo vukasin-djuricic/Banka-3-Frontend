@@ -32,6 +32,8 @@ import TotpSetupPage from "../pages/TotpSetupPage.jsx";
 import TransferPage from "../pages/TransferPage.jsx";
 import EditClientPage from "../pages/EditClientPage.jsx";
 
+import SecurityDetailPage from "../pages/SecurityDetailPage.jsx";
+
 export default function AppRouter() {
   return (
       <BrowserRouter>
@@ -59,6 +61,8 @@ export default function AppRouter() {
           <Route path="/clients/:id" element={<ProtectedRoute requiredRole="employee"><ClientDetailsPage /></ProtectedRoute>} />
           <Route path="/clients/edit/:id" element={<ProtectedRoute requiredRole="employee" requiredPermission="admin"><EditClientPage/></ProtectedRoute>}/>
 
+        <Route path="/securities/:ticker" element={<ProtectedRoute requiredRole="employee"><SecurityDetailPage /></ProtectedRoute>} />
+     
           <Route path="/employees/create" element={<ProtectedRoute requiredRole="employee" requiredPermission="admin"><CreateEmployeePage /></ProtectedRoute>}/>
           <Route path="/employees/edit/:id" element={<ProtectedRoute requiredRole="employee"><EditEmployeePage /></ProtectedRoute>} />
           <Route path="/employees/:id" element={<ProtectedRoute requiredRole="employee"><EmployeeDetailsPage /></ProtectedRoute>} />
