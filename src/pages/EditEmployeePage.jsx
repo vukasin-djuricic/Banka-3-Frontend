@@ -3,32 +3,33 @@ import { useParams, useNavigate } from "react-router-dom";
 import "./CreateEmployeePage.css";
 import "./EmployeesPage.css";
 import { getEmployeeById, updateEmployee } from "../services/EmployeeService";
-import MenuDropdown from "../components/MenuDropdown";
+import { PERMISSIONS } from "../constants/permissions";
+import Sidebar from "../components/Sidebar.jsx";
 
 function validate(form) {
   const errors = {};
-
+  if (!form.ime.trim()) errors.ime = "Ime je obavezno";
   if (!form.prezime.trim()) errors.prezime = "Prezime je obavezno.";
   if (!form.pol.trim()) errors.pol = "Pol je obavezan.";
-
   if (!form.telefon.trim()) {
     errors.telefon = "Broj telefona je obavezan.";
   } else if (!/^\+?[\d\s\-()]{7,15}$/.test(form.telefon)) {
     errors.telefon = "Unesite ispravan broj telefona.";
   }
-
   if (!form.adresa.trim()) errors.adresa = "Adresa je obavezna.";
   if (!form.pozicija.trim()) errors.pozicija = "Pozicija je obavezna.";
   if (!form.departman.trim()) errors.departman = "Departman je obavezan.";
-
   return errors;
 }
+
+const normalize = (p) => p.toLowerCase().replace(/ /g, "_");
 
 export default function EditEmployeePage() {
   const { id } = useParams();
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
+    ime: '',
     prezime: "",
     pol: "",
     telefon: "",
@@ -38,7 +39,7 @@ export default function EditEmployeePage() {
     aktivan: true,
   });
 
-  const [originalFirstName, setOriginalFirstName] = useState("");
+  const [selectedPermissions, setSelectedPermissions] = useState([]);
   const [errors, setErrors] = useState({});
   const [successMsg, setSuccessMsg] = useState("");
   const [loading, setLoading] = useState(false);
@@ -46,19 +47,25 @@ export default function EditEmployeePage() {
 
   useEffect(() => {
     getEmployeeById(Number(id))
-      .then((employee) => {
-        setOriginalFirstName(employee.firstName ?? "");
-        setForm({
-          prezime: employee.lastName ?? "",
-          pol: employee.gender ?? "",
-          telefon: employee.phone ?? "",
-          adresa: employee.address ?? "",
-          pozicija: employee.position ?? "",
-          departman: employee.department ?? "",
-          aktivan: employee.active ?? true,
-        });
-      })
-      .catch(() => setNotFound(true));
+        .then((employee) => {
+          setForm({
+            ime: employee.firstName ?? "",
+            prezime: employee.lastName ?? "",
+            pol: employee.gender ?? "",
+            telefon: employee.phone ?? "",
+            adresa: employee.address ?? "",
+            pozicija: employee.position ?? "",
+            departman: employee.department ?? "",
+            aktivan: employee.active ?? true,
+          });
+
+          const unique = [...new Set(
+              (employee.permissions || []).map(p => normalize(p))
+          )];
+
+          setSelectedPermissions(unique);
+        })
+        .catch(() => setNotFound(true));
   }, [id]);
 
   function handleChange(e) {
@@ -67,27 +74,29 @@ export default function EditEmployeePage() {
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
-
-    if (errors[name]) {
-      setErrors((prev) => ({ ...prev, [name]: "" }));
-    }
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: "" }));
   }
+
+  const togglePermission = (perm) => {
+    setSelectedPermissions(prev => {
+      if (prev.includes(perm)) {
+        return prev.filter(p => p !== perm);
+      }
+      return [...prev, perm];
+    });
+  };
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setSuccessMsg("");
-
     const errs = validate(form);
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
       return;
     }
-
     setLoading(true);
-
     try {
       await updateEmployee(Number(id), {
-        firstName: originalFirstName,
+        firstName: form.ime,
         lastName: form.prezime,
         gender: form.pol,
         phoneNumber: form.telefon,
@@ -95,134 +104,121 @@ export default function EditEmployeePage() {
         position: form.pozicija,
         department: form.departman,
         active: form.aktivan,
+        permissions: selectedPermissions.map(p => p.toUpperCase())
       });
-
       setSuccessMsg("Profil uspešno izmenjen.");
-      setErrors({});
     } catch (err) {
-      setErrors({
-        submit: err.response?.data?.error || "Greška pri izmeni profila.",
-      });
+      setErrors({ submit: err.response?.data?.error || "Greška pri izmeni profila." });
     } finally {
       setLoading(false);
     }
   }
 
-  function field(label, name, type = "text", placeholder = "unesite...") {
-    return (
-      <div className="form-group">
-        <label>{label}</label>
-        <input
-          type={type}
-          name={name}
-          value={form[name]}
-          onChange={handleChange}
-          placeholder={placeholder}
-          className={errors[name] ? "input-error" : ""}
-        />
-        {errors[name] && <span className="error-msg">{errors[name]}</span>}
-      </div>
-    );
-  }
-
   if (notFound) {
     return (
-      <div className="page-bg">
-        <img src="/bank-logo.png" className="bank-logo" />
-        <MenuDropdown />
-
-        <div className="create-page">
-          <div className="create-form-card">
-            <p className="submit-error">Zaposleni nije pronađen.</p>
+        <div className="page-bg">
+          <Sidebar />
+          <div className="create-page">
+            <div className="create-form-card">
+              <p className="submit-error">Zaposleni nije pronađen.</p>
+            </div>
           </div>
         </div>
-      </div>
     );
   }
 
   return (
-    <div className="page-bg">
-      <img src="/bank-logo.png" className="bank-logo" />
-      <MenuDropdown />
+      <div className="page-bg">
+        <Sidebar />
+        <div className="create-page">
+          <div className="create-form-card">
+            {successMsg && <div className="success-msg">{successMsg}</div>}
 
-      <div className="create-page">
-        <div className="create-form-card">
+            {Object.keys(errors).length > 0 && (
+                <div className="error-msg">
+                  {Object.values(errors)[0]}
+                </div>
+            )}
 
-          {/* HEADER */}
-          <div className="create-header">
-            <div className="create-header-text">
-              <p className="create-eyebrow">IZMENA PROFILA</p>
-              <h1>Uredi zaposlenog</h1>
-              <p className="create-subtitle">
-                Izmenite osnovne podatke i status zaposlenog.
-              </p>
-            </div>
+            <form onSubmit={handleSubmit}>
+              <div className="form-row-three">
+                <div className="form-group">
+                  <label>Prezime</label>
+                  <input name="prezime" value={form.prezime} onChange={handleChange} />
+                </div>
 
-            <div className="create-header-actions">
-              <button
-                type="button"
-                className="create-btn create-btn-secondary"
-                onClick={() => navigate("/employees")}
-              >
-                Nazad
-              </button>
-            </div>
-          </div>
+                <div className="form-group">
+                  <label>Pol</label>
+                  <input name="pol" value={form.pol} onChange={handleChange} />
+                </div>
 
-          {successMsg && <div className="success-msg">{successMsg}</div>}
-          {errors.submit && <div className="submit-error">{errors.submit}</div>}
+                <div className="form-group">
+                  <label>Telefon</label>
+                  <input name="telefon" value={form.telefon} onChange={handleChange} />
+                </div>
+              </div>
 
-          <form onSubmit={handleSubmit} noValidate>
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>Adresa</label>
+                  <input name="adresa" value={form.adresa} onChange={handleChange} />
+                </div>
 
-            <div style={{ marginBottom: "16px" }}>
-              {field("Prezime", "prezime")}
-            </div>
+                <div className="form-group">
+                  <label>Pozicija</label>
+                  <input name="pozicija" value={form.pozicija} onChange={handleChange} />
+                </div>
 
-            <div className="form-row-two" style={{ marginBottom: "16px" }}>
-              {field("Pol", "pol")}
-              {field("Broj telefona", "telefon")}
-            </div>
+                <div className="form-group">
+                  <label>Departman</label>
+                  <input name="departman" value={form.departman} onChange={handleChange} />
+                </div>
+              </div>
 
-            <div style={{ marginBottom: "16px" }}>
-              {field("Adresa", "adresa")}
-            </div>
-
-            <div style={{ marginBottom: "16px" }}>
-              {field("Pozicija", "pozicija")}
-            </div>
-
-            <div style={{ marginBottom: "16px" }}>
-              {field("Departman", "departman")}
-            </div>
-
-            <div className="form-group" style={{ marginBottom: "24px" }}>
-              <label className="checkbox-label">
-                Aktivan
+              <div className="form-group">
+                <label>Aktivan</label>
                 <input
-                  type="checkbox"
-                  name="aktivan"
-                  checked={form.aktivan}
-                  onChange={handleChange}
+                    type="checkbox"
+                    name="aktivan"
+                    checked={form.aktivan}
+                    onChange={handleChange}
                 />
-                <span className="checkbox-box">
-                  {form.aktivan ? "✓" : ""}
-                </span>
-              </label>
-            </div>
+              </div>
 
-            <div className="form-actions">
-              <button
-                className="create-btn create-btn-primary"
-                type="submit"
-                disabled={loading}
-              >
-                {loading ? "Čuvanje..." : "Sačuvaj izmene"}
-              </button>
-            </div>
+              <div className="permissions-section">
+                <span className="permissions-label">Permisije</span>
+                <div className="permissions-grid">
+                  {PERMISSIONS.map((perm) => (
+                      <label key={perm.value} className="permission-checkbox">
+                        <input
+                            type="checkbox"
+                            checked={selectedPermissions.includes(perm.value)}
+                            onChange={() => togglePermission(perm.value)}
+                        />
+                        <span className="checkmark"></span>
+                        <span className="permission-text">{perm.label}</span>
+                      </label>
+                  ))}
+                </div>
+              </div>
 
-          </form>
+              <div className="form-actions">
+                <button type="submit" className="create-btn create-btn-primary">
+                  {loading ? "Čuvanje..." : "Sačuvaj izmene"}
+                </button>
+
+                <button
+                    type="button"
+                    className="create-btn"
+                    onClick={() => navigate(-1)}
+                >
+                  Otkaži
+                </button>
+              </div>
+
+            </form>
+          </div>
         </div>
       </div>
-    </div>
   );
 }

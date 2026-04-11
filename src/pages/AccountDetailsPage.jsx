@@ -1,89 +1,214 @@
-import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { getAccountById, getAccountTransactions } from "../services/AccountService";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import {
+    getAccountByNumber,
+    getAccountTransactions,
+    getAccounts,
+    renameAccount,
+} from "../services/AccountService";
+import Sidebar from "../components/Sidebar.jsx";
 import "./AccountDetailsPage.css";
 
-function fmt(amount, currency = "RSD") {
-    if (amount == null) return "—";
+function fmt(amount, currency) {
+    if (amount == null || Number.isNaN(Number(amount))) return "—";
+
+    const formattedAmount = new Intl.NumberFormat("sr-RS", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(Number(amount));
+
+    return currency ? `${formattedAmount} ${currency}` : formattedAmount;
+}
+
+function formatAccountType(type) {
+    if (!type) return "—";
+
+    const value = String(type).toLowerCase();
+
+    if (value === "checking") return "Tekući račun";
+    if (value === "foreign") return "Devizni račun";
+    if (value === "business") return "Poslovni račun";
+    return type;
+}
+
+function formatStatus(status) {
+    if (!status) return "—";
+
+    const value = String(status).toLowerCase();
+    if (value === "active" || value === "aktivan") return "Aktivan";
+    if (value === "inactive" || value === "neaktivan") return "Neaktivan";
+    if (value === "blocked") return "Blokiran";
+
+    return status;
+}
+
+function getOwnerLabel(account) {
     return (
-        new Intl.NumberFormat("sr-RS", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-        }).format(amount) +
-        " " +
-        currency
+        account?.owner_name ||
+        account?.client_name ||
+        account?.owner_full_name ||
+        account?.owner_id ||
+        "—"
+    );
+}
+
+function getCompanyLabel(account) {
+    return (
+        account?.company_name ||
+        account?.business_name ||
+        account?.firm_name ||
+        account?.firmName ||
+        null
+    );
+}
+
+function isBusinessAccount(account) {
+    const type = String(account?.account_type || "").toLowerCase();
+    return Boolean(
+        account?.company_name ||
+        account?.business_name ||
+        account?.firm_name ||
+        account?.firmName ||
+        type.includes("business") ||
+        type.includes("poslov")
     );
 }
 
 export default function AccountDetailsPage() {
-    const { id } = useParams();
+    const { accountNumber } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
+    const backTarget = location.state?.from || "/accounts";
 
     const [account, setAccount] = useState(null);
     const [transactions, setTransactions] = useState([]);
+    const [allAccounts, setAllAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
+    const [isRenameOpen, setIsRenameOpen] = useState(false);
+    const [newAccountName, setNewAccountName] = useState("");
+    const [renameError, setRenameError] = useState("");
+    const [renameLoading, setRenameLoading] = useState(false);
+
     useEffect(() => {
-        if (!id) return;
+        if (!accountNumber) return;
         let cancelled = false;
 
         const load = async () => {
             try {
-                const [acc, txs] = await Promise.all([
-                    getAccountById(Number(id)),
-                    getAccountTransactions(Number(id)),
+                const [acc, txs, accountsData] = await Promise.all([
+                    getAccountByNumber(accountNumber),
+                    getAccountTransactions(accountNumber),
+                    getAccounts().catch(() => []),
                 ]);
+
                 if (!cancelled) {
                     setAccount(acc);
-                    setTransactions(txs);
+                    setTransactions(Array.isArray(txs) ? txs : []);
+                    setAllAccounts(Array.isArray(accountsData) ? accountsData : []);
+                    setNewAccountName(acc?.account_name || "");
                 }
-            } catch {
-                if (!cancelled) setError("Greška pri učitavanju podataka o računu.");
+            } catch (err) {
+                console.error("Greška pri učitavanju:", err);
+                if (!cancelled) {
+                    setError("Greška pri učitavanju podataka o računu.");
+                }
             } finally {
                 if (!cancelled) setLoading(false);
             }
         };
 
         load();
-        return () => { cancelled = true; };
-    }, [id]);
 
-    const quickActions = [
-        {
-            label: "Uplata",
-            target: "/deposit",
-            icon: (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" />
-                </svg>
-            ),
-        },
-        {
-            label: "Plaćanje",
-            target: "/payment",
-            icon: (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
-                </svg>
-            ),
-        },
-        {
-            label: "Prenos",
-            target: "/transfer",
-            icon: (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" />
-                    <polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" />
-                </svg>
-            ),
-        },
-    ];
+        return () => {
+            cancelled = true;
+        };
+    }, [accountNumber]);
+
+    const reservedAmount = useMemo(() => {
+        const balance = Number(account?.balance || 0);
+        const available = Number(account?.available_balance ?? account?.balance ?? 0);
+        const reserved = balance - available;
+        return reserved > 0 ? reserved : 0;
+    }, [account]);
+
+    const businessAccount = useMemo(() => isBusinessAccount(account), [account]);
+
+    const handleOpenRename = () => {
+        setRenameError("");
+        setNewAccountName(account?.account_name || "");
+        setIsRenameOpen(true);
+    };
+
+    const handleCloseRename = () => {
+        setIsRenameOpen(false);
+        setRenameError("");
+        setNewAccountName(account?.account_name || "");
+    };
+
+    const handleRenameSubmit = async () => {
+        const trimmed = newAccountName.trim();
+
+        if (!trimmed) {
+            setRenameError("Novo ime računa je obavezno.");
+            return;
+        }
+
+        if (trimmed === (account?.account_name || "").trim()) {
+            setRenameError("Novo ime računa mora biti drugačije od trenutnog.");
+            return;
+        }
+
+        const duplicateName = allAccounts.some((acc) => {
+            if (!acc || acc.account_number === account?.account_number) return false;
+
+            const sameOwner =
+                String(acc.owner_id ?? "") === String(account?.owner_id ?? "");
+
+            return sameOwner && String(acc.account_name || "").trim().toLowerCase() === trimmed.toLowerCase();
+        });
+
+        if (duplicateName) {
+            setRenameError("Već postoji račun sa tim nazivom kod istog klijenta.");
+            return;
+        }
+
+        try {
+            setRenameLoading(true);
+            setRenameError("");
+
+            const updated = await renameAccount(account.account_number, trimmed);
+
+            setAccount((prev) => ({
+                ...prev,
+                ...(updated && typeof updated === "object" ? updated : {}),
+                account_name: trimmed,
+            }));
+
+            setAllAccounts((prev) =>
+                prev.map((acc) =>
+                    acc.account_number === account.account_number
+                        ? { ...acc, account_name: trimmed }
+                        : acc
+                )
+            );
+
+            setIsRenameOpen(false);
+        } catch (err) {
+            console.error("Greška pri promeni naziva računa:", err);
+            setRenameError("Promena naziva računa nije uspela. Proveri backend rutu.");
+        } finally {
+            setRenameLoading(false);
+        }
+    };
 
     if (loading) {
         return (
             <div className="ad-page">
-                <p className="ad-state-msg">Učitavanje...</p>
+                <div className="ad-content">
+                    <p className="ad-state-msg">Učitavanje podataka...</p>
+                </div>
             </div>
         );
     }
@@ -91,73 +216,198 @@ export default function AccountDetailsPage() {
     if (error || !account) {
         return (
             <div className="ad-page">
-                <p className="ad-state-msg ad-state-msg--error">{error || "Račun nije pronađen."}</p>
+                <div className="ad-content">
+                    <p className="ad-state-msg ad-state-msg--error">
+                        {error || "Račun nije pronađen."}
+                    </p>
+                    <div className="ad-center-actions">
+                        <button className="ad-back-btn" onClick={() => navigate(backTarget)}>
+                            <ChevronLeftIcon />
+                        </button>
+                    </div>
+                </div>
             </div>
         );
     }
 
-    const reserved = account.balance - account.available;
-
     return (
         <div className="ad-page">
             <div className="ad-content">
+                <Sidebar />
 
-                {/* ── HEADER ── */}
                 <div className="ad-header">
-                    <button className="ad-back-btn" onClick={() => navigate("/accounts")}>
+                    <button className="ad-back-btn" onClick={() => navigate(backTarget)}>
                         <ChevronLeftIcon />
                     </button>
-                    <h1 className="ad-title">{account.name}</h1>
+                    <h1 className="ad-title">{account.account_name || "Detalji računa"}</h1>
                 </div>
 
-                {/* ── BALANCE CARD ── */}
                 <div className="ad-balance-card">
-                    <p className="ad-account-number">{account.number}</p>
+                    <div className="dash-bc-circle1" />
+                    <div className="dash-bc-circle2" />
+
+                    <p className="ad-account-number">{account.account_number}</p>
                     <p className="ad-balance-main">{fmt(account.balance, account.currency)}</p>
+
                     <div className="ad-balance-row">
                         <div>
                             <p className="ad-balance-label">Raspoloživo</p>
-                            <p className="ad-balance-available">{fmt(account.available, account.currency)}</p>
+                            <p className="ad-balance-available">
+                                {fmt(account.available_balance ?? account.balance, account.currency)}
+                            </p>
                         </div>
                         <div>
                             <p className="ad-balance-label">Rezervisano</p>
-                            <p className="ad-balance-reserved">{fmt(reserved, account.currency)}</p>
+                            <p className="ad-balance-reserved">
+                                {fmt(reservedAmount, account.currency)}
+                            </p>
                         </div>
-                    </div>
-                    <div className="dash-quick-row">
-                        {quickActions.map(({label, icon, target}) => (
-                            <button key={label} className="dash-quick-btn" onClick={() => navigate(target)}>
-                                {icon}
-                                <span>{label}</span>
-                            </button>
-                        ))}
                     </div>
                 </div>
 
-                {/* ── TRANSACTIONS ── */}
-                <h2 className="ad-section-title">Transakcije</h2>
+                <div className="ad-details-card">
+                    <h2 className="ad-section-title">Detalji računa</h2>
+
+                    <div className="ad-details-grid">
+
+                        <div className="ad-detail-item">
+                            <span className="ad-detail-label">ID vlasnika</span>
+                            <strong className="ad-detail-value">{getOwnerLabel(account)}</strong>
+                        </div>
+
+                        <div className="ad-detail-item">
+                            <span className="ad-detail-label">Tip</span>
+                            <strong className="ad-detail-value">{formatAccountType(account.account_type)}</strong>
+                        </div>
+
+                        <div className="ad-detail-item">
+                            <span className="ad-detail-label">Valuta</span>
+                            <strong className="ad-detail-value">{account.currency || "—"}</strong>
+                        </div>
+
+                        <div className="ad-detail-item">
+                            <span className="ad-detail-label">Status</span>
+                            <strong className="ad-detail-value">{formatStatus(account.status)}</strong>
+                        </div>
+
+                        {businessAccount && (
+                            <div className="ad-detail-item">
+                                <span className="ad-detail-label">Firma</span>
+                                <strong className="ad-detail-value">{getCompanyLabel(account) || "—"}</strong>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="ad-actions">
+                        <button className="ad-action-btn" onClick={handleOpenRename}>
+                            Promena naziva računa
+                        </button>
+
+                        <button
+                            className="ad-action-btn"
+                            onClick={() => navigate("/payment", { state: { fromAccount: account } })}
+                        >
+                            Novo plaćanje
+                        </button>
+
+                        <button
+                            className="ad-action-btn ad-action-btn--secondary"
+                            type="button"
+                            onClick={() => alert("Promena limita zahteva verifikaciju i backend podršku.")}
+                        >
+                            Promena limita
+                        </button>
+                    </div>
+                </div>
+
+                <h2 className="ad-section-title">Poslednje transakcije</h2>
 
                 {transactions.length === 0 ? (
-                    <p className="ad-empty">Nema transakcija</p>
+                    <p className="ad-empty">Nema zabeleženih transakcija za ovaj račun.</p>
                 ) : (
                     <div className="ad-txn-list">
-                        {transactions.map((tx) => (
-                            <div key={tx.id} className="ad-txn-row">
-                            <div className={`ad-txn-icon ${tx.amount > 0 ? "ad-txn-icon--credit" : "ad-txn-icon--debit"}`}>
-                                    {tx.amount > 0 ? <ArrowDownIcon /> : <ArrowUpIcon />}
+                        {transactions.map((tx, index) => {
+                            const amt = tx.final_amount || tx.initial_amount || tx.amount || 0;
+                            const txCurrency = tx.currency || account.currency;
+                            const isDebit = String(tx.from_account || "") === String(account.account_number || "");
+
+                            return (
+                                <div key={tx.id || index} className="ad-txn-row">
+                                    <div
+                                        className={`ad-txn-icon ${
+                                            !isDebit ? "ad-txn-icon--credit" : "ad-txn-icon--debit"
+                                        }`}
+                                    >
+                                        {!isDebit ? <ArrowDownIcon /> : <ArrowUpIcon />}
+                                    </div>
+
+                                    <div className="ad-txn-info">
+                                        <p className="ad-txn-desc">{tx.purpose || tx.reason || "Transakcija"}</p>
+                                        <p className="ad-txn-date">
+                                            {tx.timestamp
+                                                ? new Date(tx.timestamp).toLocaleDateString("sr-RS")
+                                                : "---"}
+                                        </p>
+                                    </div>
+
+                                    <p
+                                        className={`ad-txn-amount ${
+                                            !isDebit ? "ad-txn-amount--credit" : ""
+                                        }`}
+                                    >
+                                        {isDebit ? "-" : "+"}
+                                        {fmt(amt, txCurrency)}
+                                    </p>
                                 </div>
-                                <div className="ad-txn-info">
-                                    <p className="ad-txn-desc">{tx.desc}</p>
-                                    <p className="ad-txn-date">{new Date(tx.date).toLocaleDateString("sr-RS")}</p>
-                                </div>
-                                <p className={`ad-txn-amount ${tx.amount > 0 ? "ad-txn-amount--credit" : ""}`}>
-                                    {tx.amount > 0 ? "+" : ""}{fmt(tx.amount, account.currency)}
-                                </p>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
 
+                {isRenameOpen && (
+                    <div className="ad-modal-overlay" onClick={handleCloseRename}>
+                        <div className="ad-modal" onClick={(e) => e.stopPropagation()}>
+                            <h3 className="ad-modal-title">Promena naziva računa</h3>
+
+                            <p className="ad-modal-current">
+                                Trenutni naziv: <strong>{account.account_name || "—"}</strong>
+                            </p>
+
+                            <label className="ad-modal-label" htmlFor="newAccountName">
+                                Novo ime računa
+                            </label>
+                            <input
+                                id="newAccountName"
+                                className="ad-modal-input"
+                                value={newAccountName}
+                                onChange={(e) => setNewAccountName(e.target.value)}
+                                placeholder="Unesi novo ime računa"
+                            />
+
+                            {renameError ? <p className="ad-modal-error">{renameError}</p> : null}
+
+                            <div className="ad-modal-actions">
+                                <button
+                                    className="ad-action-btn ad-action-btn--secondary"
+                                    type="button"
+                                    onClick={handleCloseRename}
+                                    disabled={renameLoading}
+                                >
+                                    Otkaži
+                                </button>
+
+                                <button
+                                    className="ad-action-btn"
+                                    type="button"
+                                    onClick={handleRenameSubmit}
+                                    disabled={renameLoading}
+                                >
+                                    {renameLoading ? "Čuvanje..." : "Sačuvaj"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -165,7 +415,16 @@ export default function AccountDetailsPage() {
 
 function ChevronLeftIcon() {
     return (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
             <path d="M15 18l-6-6 6-6" />
         </svg>
     );
@@ -173,15 +432,33 @@ function ChevronLeftIcon() {
 
 function ArrowDownIcon() {
     return (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 5v14M5 12l7 7 7-7" />
+        <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <path d="M12 5v14M5 12l7-7 7 7" />
         </svg>
     );
 }
 
 function ArrowUpIcon() {
     return (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
             <path d="M12 19V5M5 12l7-7 7 7" />
         </svg>
     );

@@ -1,8 +1,12 @@
-import { useState } from "react";
+import { useState,useEffect  } from "react";
 import { useNavigate } from "react-router-dom";
 import { createAccount } from "../services/AccountService";
-import { getCurrentUserId } from "../services/AuthService";
+import Sidebar from "../components/Sidebar.jsx";
 import "./CreateAccountPage.css";
+import { getClients, getClientByEmail, createClient } from "../services/ClientService";
+import { requestPasswordReset } from "../services/AuthService";
+
+
 
 const ACCOUNT_TYPES = [
     {
@@ -74,6 +78,15 @@ const EMPTY_COMPANY = {
     activity_code: "",
     address: "",
 };
+const EMPTY_CLIENT = {
+    firstName: "",
+    lastName: "",
+    email: "",
+    phoneNumber: "",
+    address: "",
+    gender: "",
+    dateOfBirth: "",
+};
 
 const PERSONAL_SUBTYPES = [
     { value: "standardni", label: "Standardni" },
@@ -84,19 +97,43 @@ const PERSONAL_SUBTYPES = [
     { value: "za_mlade", label: "Za mlade" },
 ];
 
-function validate(type, currency, ownerType, subtype) {
+const COMPANY_SUBTYPES = [
+    { value: "DOO", label: "D.O.O.", desc: "Društvo sa ograničenom odgovornošću" },
+    { value: "AD", label: "A.D.", desc: "Akcionarsko društvo" },
+];
+
+function validate(type, currency, ownerType, subtype, companySubtype, clientId, initialBalance, company) {
     const errors = {};
 
     if (!type) errors.type = "Izaberite tip računa.";
+    if (!clientId) errors.client = "Izaberite klijenta.";
     if (type === "DEVIZNI" && !currency) errors.currency = "Izaberite valutu.";
     if (!ownerType) errors.ownerType = "Izaberite tip vlasnika.";
     if (ownerType === "PERSONAL" && !subtype) errors.subtype = "Izaberite podtip računa.";
+    if (ownerType === "BUSINESS" && !companySubtype) {
+        errors.companySubtype = "Izaberite tip kompanije.";
+    }
+
+    if (initialBalance === "" || Number(initialBalance) < 0) {
+        errors.initialBalance = "Unesite početno stanje.";
+    }
+
+    if (ownerType === "BUSINESS") {
+        if (!company.name.trim()) errors.companyName = "Naziv kompanije je obavezan.";
+        if (!company.pib.trim()) errors.pib = "PIB je obavezan.";
+        if (!company.registration_number.trim()) errors.registration_number = "Matični broj je obavezan.";
+        if (!company.activity_code.trim()) errors.activity_code = "Šifra delatnosti je obavezna.";
+        if (!company.address.trim()) errors.companyAddress = "Adresa kompanije je obavezna.";
+    }
 
     return errors;
 }
-
 export default function CreateAccountPage() {
     const navigate = useNavigate();
+
+    const [clients, setClients] = useState([]);
+    const [selectedClientId, setSelectedClientId] = useState("");
+
 
     const [accountType, setAccountType] = useState("");
     const [currency, setCurrency] = useState("");
@@ -109,6 +146,116 @@ export default function CreateAccountPage() {
     const [dailyLimit, setDailyLimit] = useState("");
     const [monthlyLimit, setMonthlyLimit] = useState("");
     const [createCard, setCreateCard] = useState(false);
+    const [companySubtype, setCompanySubtype] = useState("");
+    const [success, setSuccess] = useState(false);
+    const [initialBalance, setInitialBalance] = useState("");
+    const [accountName, setAccountName] = useState("");
+    const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+    const [clientForm, setClientForm] = useState(EMPTY_CLIENT);
+    const [clientFormErrors, setClientFormErrors] = useState({});
+    const [clientSubmitting, setClientSubmitting] = useState(false);
+
+
+
+    useEffect(() => {
+        async function fetchClients() {
+            try {
+                const data = await getClients();
+                setClients(data);
+            } catch (err) {
+                console.error("Greška pri učitavanju klijenata:", err);
+            }
+        }
+        fetchClients();
+    }, []);
+
+    function resetClientForm() {
+        setClientForm(EMPTY_CLIENT);
+        setClientFormErrors({});
+    }
+
+    function openClientModal() {
+        resetClientForm();
+        setIsClientModalOpen(true);
+    }
+
+    function closeClientModal() {
+        if (clientSubmitting) return;
+        setIsClientModalOpen(false);
+        resetClientForm();
+    }
+
+    function handleClientFormChange(e) {
+        const { name, value } = e.target;
+        setClientForm((prev) => ({ ...prev, [name]: value }));
+
+        if (clientFormErrors[name]) {
+            setClientFormErrors((prev) => ({ ...prev, [name]: "" }));
+        }
+    }
+
+    function validateClientForm() {
+        const errs = {};
+
+        if (!clientForm.firstName.trim()) errs.firstName = "Ime je obavezno.";
+        if (!clientForm.lastName.trim()) errs.lastName = "Prezime je obavezno.";
+        if (!clientForm.email.trim()) errs.email = "Email je obavezan.";
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientForm.email)) errs.email = "Unesite ispravan email.";
+        if (!clientForm.phoneNumber.trim()) errs.phoneNumber = "Broj telefona je obavezan.";
+        if (!clientForm.address.trim()) errs.address = "Adresa je obavezna.";
+        if (!clientForm.gender.trim()) errs.gender = "Pol je obavezan.";
+        if (!clientForm.dateOfBirth.trim()) errs.dateOfBirth = "Datum rođenja je obavezan.";
+
+        return errs;
+    }
+
+    async function handleCreateClient(e) {
+        e.preventDefault();
+
+        const errs = validateClientForm();
+        if (Object.keys(errs).length > 0) {
+            setClientFormErrors(errs);
+            return;
+        }
+
+        try {
+            setClientSubmitting(true);
+            let activationMailSent = true;
+
+            await createClient(clientForm);
+
+            try {
+                await requestPasswordReset(clientForm.email);
+            } catch {
+                activationMailSent = false;
+            }
+
+            const freshClients = await getClients();
+            setClients(freshClients);
+
+            const createdClient = await getClientByEmail(clientForm.email);
+
+            if (createdClient?.id) {
+                setSelectedClientId(String(createdClient.id));
+                setErrors((prev) => ({ ...prev, client: "" }));
+            }
+
+            if (!activationMailSent) {
+                setClientFormErrors({
+                    submit: "Klijent je kreiran, ali aktivacioni email trenutno nije poslat.",
+                });
+                return;
+            }
+
+            closeClientModal();
+        } catch (err) {
+            setClientFormErrors({
+                submit: err?.response?.data?.error || "Greška pri kreiranju klijenta.",
+            });
+        } finally {
+            setClientSubmitting(false);
+        }
+    }
 
     function handleTypeSelect(value) {
         setAccountType(value);
@@ -124,6 +271,7 @@ export default function CreateAccountPage() {
     function handleOwnerTypeSelect(value) {
         setOwnerType(value);
         setSubtype("");
+        setCompanySubtype("");
         if (value === "PERSONAL") setCompany(EMPTY_COMPANY);
         setErrors((prev) => ({ ...prev, ownerType: "", subtype: "", companyName: "", pib: "", registration_number: "", activity_code: "", companyAddress: "" }));
     }
@@ -139,24 +287,29 @@ export default function CreateAccountPage() {
         e.preventDefault();
         setSubmitError("");
 
-        const errs = validate(accountType, currency, ownerType, subtype);
+
+        const errs = validate(accountType, currency, ownerType, subtype, companySubtype, selectedClientId,initialBalance,
+            company);
         if (Object.keys(errs).length > 0) {
             setErrors(errs);
             return;
         }
 
+
         try {
             setSubmitting(true);
-            const userId = getCurrentUserId();
+            const userId = selectedClientId;
             if (!userId) {
-                throw new Error("Niste ulogovani. Prijavite se ponovo.");
+                setSubmitError("Morate izabrati klijenta.");
+                return;
             }
             await createAccount({
                 client_id: Number(userId),
+                name: accountName.trim() || undefined,
                 account_type: accountType,
-                subtype: ownerType === "BUSINESS" ? "DOO" : subtype,
+                subtype: ownerType === "BUSINESS" ? companySubtype : subtype,
                 currency,
-                initial_balance: 0,
+                initial_balance: Number(initialBalance),
                 daily_limit: dailyLimit ? Number(dailyLimit) : 0,
                 monthly_limit: monthlyLimit ? Number(monthlyLimit) : 0,
                 create_card: createCard,
@@ -168,7 +321,7 @@ export default function CreateAccountPage() {
                     address: company.address,
                 } : undefined,
             });
-            navigate("/dashboard");
+            setSuccess(true);
         } catch (err) {
             setSubmitError(err.message || "Greška pri kreiranju računa.");
         } finally {
@@ -179,13 +332,61 @@ export default function CreateAccountPage() {
     const readyForSummary = accountType && currency && ownerType &&
         (ownerType === "BUSINESS" || subtype);
 
+    if (success) {
+        return (
+            <div className="ca-shell">
+                <Sidebar />
+                <div className="ca-content">
+                    <div className="ca-success-box">
+                        <h2>✅ Račun uspešno kreiran</h2>
+                        <p>Račun je dodat u sistem.</p>
+
+                        <div className="ca-actions">
+                            <button
+                                className="ca-btn-back"
+                                onClick={() => navigate("/admin/accounts")}
+                            >
+                                Nazad na dashboard
+                            </button>
+
+                            <button
+                                className="ca-btn-submit"
+                                onClick={() => {
+                                    setSuccess(false);
+                                    // reset forme ako hoćeš
+                                    setSelectedClientId("");
+                                    setAccountType("");
+                                    setCurrency("");
+                                    setOwnerType("");
+                                    setSubtype("");
+                                    setCompany(EMPTY_COMPANY);
+                                    setInitialBalance("");
+                                    setAccountName("");
+                                    setCreateCard(false);
+                                    setDailyLimit("");
+                                    setMonthlyLimit("");
+                                    setCompanySubtype("");
+                                    resetClientForm();
+                                }}
+                            >
+                                Kreiraj još jedan račun
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
+
         <div className="ca-shell">
+            <Sidebar/>
             <div className="ca-content">
 
                 {/* Header */}
                 <div className="ca-header">
-                    <button className="ca-back-btn" onClick={() => navigate("/dashboard")}>
+                    <button className="ca-back-btn" onClick={() => navigate("/admin/accounts")}>
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M15 18l-6-6 6-6" />
                         </svg>
@@ -197,6 +398,37 @@ export default function CreateAccountPage() {
                 </div>
 
                 <form onSubmit={handleSubmit} noValidate>
+
+                    <div className="ca-section">
+                        <div className="ca-section-headline">
+                            <p className="ca-section-label">Klijent</p>
+                            <button
+                                type="button"
+                                className="ca-link-btn"
+                                onClick={openClientModal}
+                            >
+                                + Kreiraj novog klijenta
+                            </button>
+                        </div>
+
+                        <select
+                            className={`ca-input ${errors.client ? "ca-input--error" : ""}`}
+                            value={selectedClientId}
+                            onChange={(e) => {
+                                setSelectedClientId(e.target.value);
+                                setErrors((prev) => ({ ...prev, client: "" }));
+                            }}
+                        >
+                            <option value="">Izaberite klijenta</option>
+                            {clients.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                    {c.firstName} {c.lastName} ({c.email})
+                                </option>
+                            ))}
+                        </select>
+
+                        {errors.client && <p className="ca-error">{errors.client}</p>}
+                    </div>
 
                     {/* ── Account type ── */}
                     <div className="ca-section">
@@ -317,6 +549,27 @@ export default function CreateAccountPage() {
                             <div className="ca-company-form">
 
                                 <div className="ca-field">
+                                    <label className="ca-field-label">Tip kompanije</label>
+                                    <div className="ca-currency-grid">
+                                        {COMPANY_SUBTYPES.map(({value, label, desc}) => (
+                                            <button
+                                                key={value}
+                                                type="button"
+                                                className={`ca-currency-btn ${companySubtype === value ? "ca-currency-btn--selected" : ""}`}
+                                                onClick={() => {
+                                                    setCompanySubtype(value);
+                                                    setErrors((prev) => ({...prev, companySubtype: ""}));
+                                                }}
+                                            >
+                                                <span className="ca-currency-code">{label}</span>
+                                                <span className="ca-currency-name">{desc}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                    {errors.companySubtype && <p className="ca-error">{errors.companySubtype}</p>}
+                                </div>
+
+                                <div className="ca-field">
                                     <label className="ca-field-label">Naziv kompanije</label>
                                     <input
                                         className={`ca-input ${errors.companyName ? "ca-input--error" : ""}`}
@@ -352,7 +605,8 @@ export default function CreateAccountPage() {
                                             placeholder="8 cifara"
                                             maxLength={8}
                                         />
-                                        {errors.registration_number && <p className="ca-error">{errors.registration_number}</p>}
+                                        {errors.registration_number &&
+                                            <p className="ca-error">{errors.registration_number}</p>}
                                     </div>
                                 </div>
 
@@ -383,13 +637,48 @@ export default function CreateAccountPage() {
                             </div>
                         </div>
                     )}
+                    <div className="ca-section">
+                        <p className="ca-section-label">Naziv računa</p>
+                        <div className="ca-field">
+                            <label className="ca-field-label">Naziv (opciono)</label>
+                            <input
+                                className="ca-input"
+                                type="text"
+                                value={accountName}
+                                onChange={(e) => setAccountName(e.target.value)}
+                                placeholder="npr. Moj tekući račun"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="ca-section">
+                        <p className="ca-section-label">Početno stanje</p>
+                        <div className="ca-field">
+                            <label className="ca-field-label">
+                                Iznos ({currency || "RSD"})
+                            </label>
+                            <input
+                                className={`ca-input ${errors.initialBalance ? "ca-input--error" : ""}`}
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={initialBalance}
+                                onChange={(e) => {
+                                    setInitialBalance(e.target.value);
+                                    setErrors((prev) => ({ ...prev, initialBalance: "" }));
+                                }}
+                                placeholder="0.00"
+                            />
+                            {errors.initialBalance && <p className="ca-error">{errors.initialBalance}</p>}
+                        </div>
+                    </div>
 
                     {/* ── Limits & card ── */}
                     {ownerType && (
                         <div className="ca-section">
                             <p className="ca-section-label">Podešavanja računa</p>
 
-                            <div className="ca-field-row" style={{ marginBottom: 12 }}>
+                            <div className="ca-field-row" style={{marginBottom: 12}}>
                                 <div className="ca-field">
                                     <label className="ca-field-label">Dnevni limit (RSD)</label>
                                     <input
@@ -453,6 +742,12 @@ export default function CreateAccountPage() {
                                     <span>{PERSONAL_SUBTYPES.find(s => s.value === subtype)?.label}</span>
                                 </div>
                             )}
+                            {ownerType === "BUSINESS" && companySubtype && (
+                                <div className="ca-summary-row">
+                                    <span>Tip kompanije</span>
+                                    <span>{companySubtype}</span>
+                                </div>
+                            )}
                             <div className="ca-summary-row">
                                 <span>Dnevni limit</span>
                                 <span>{dailyLimit ? `${Number(dailyLimit).toLocaleString()} RSD` : "Bez limita"}</span>
@@ -480,6 +775,144 @@ export default function CreateAccountPage() {
                     </div>
 
                 </form>
+                {isClientModalOpen && (
+                    <div className="ca-modal-overlay" onClick={closeClientModal}>
+                        <div className="ca-modal" onClick={(e) => e.stopPropagation()}>
+                            <div className="ca-modal-header">
+                                <div>
+                                    <p className="ca-subtitle">Novi klijent</p>
+                                    <h2 className="ca-modal-title">Kreiranje klijenta</h2>
+                                </div>
+                                <button
+                                    type="button"
+                                    className="ca-modal-close"
+                                    onClick={closeClientModal}
+                                >
+                                    ×
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleCreateClient} className="ca-company-form" noValidate>
+                                <div className="ca-field-row">
+                                    <div className="ca-field">
+                                        <label className="ca-field-label">Ime</label>
+                                        <input
+                                            className={`ca-input ${clientFormErrors.firstName ? "ca-input--error" : ""}`}
+                                            name="firstName"
+                                            value={clientForm.firstName}
+                                            onChange={handleClientFormChange}
+                                            placeholder="Ime"
+                                        />
+                                        {clientFormErrors.firstName && <p className="ca-error">{clientFormErrors.firstName}</p>}
+                                    </div>
+
+                                    <div className="ca-field">
+                                        <label className="ca-field-label">Prezime</label>
+                                        <input
+                                            className={`ca-input ${clientFormErrors.lastName ? "ca-input--error" : ""}`}
+                                            name="lastName"
+                                            value={clientForm.lastName}
+                                            onChange={handleClientFormChange}
+                                            placeholder="Prezime"
+                                        />
+                                        {clientFormErrors.lastName && <p className="ca-error">{clientFormErrors.lastName}</p>}
+                                    </div>
+                                </div>
+
+                                <div className="ca-field-row">
+                                    <div className="ca-field">
+                                        <label className="ca-field-label">Email</label>
+                                        <input
+                                            className={`ca-input ${clientFormErrors.email ? "ca-input--error" : ""}`}
+                                            name="email"
+                                            type="email"
+                                            value={clientForm.email}
+                                            onChange={handleClientFormChange}
+                                            placeholder="email@example.com"
+                                        />
+                                        {clientFormErrors.email && <p className="ca-error">{clientFormErrors.email}</p>}
+                                    </div>
+
+                                    <div className="ca-field">
+                                        <label className="ca-field-label">Telefon</label>
+                                        <input
+                                            className={`ca-input ${clientFormErrors.phoneNumber ? "ca-input--error" : ""}`}
+                                            name="phoneNumber"
+                                            value={clientForm.phoneNumber}
+                                            onChange={handleClientFormChange}
+                                            placeholder="+381..."
+                                        />
+                                        {clientFormErrors.phoneNumber && <p className="ca-error">{clientFormErrors.phoneNumber}</p>}
+                                    </div>
+                                </div>
+
+                                <div className="ca-field-row">
+                                    <div className="ca-field">
+                                        <label className="ca-field-label">Pol</label>
+                                        <select
+                                            className={`ca-input ${clientFormErrors.gender ? "ca-input--error" : ""}`}
+                                            name="gender"
+                                            value={clientForm.gender}
+                                            onChange={handleClientFormChange}
+                                        >
+                                            <option value="">Izaberite pol</option>
+                                            <option value="M">Muški</option>
+                                            <option value="F">Ženski</option>
+                                        </select>
+                                        {clientFormErrors.gender && <p className="ca-error">{clientFormErrors.gender}</p>}
+                                    </div>
+
+                                    <div className="ca-field">
+                                        <label className="ca-field-label">Datum rođenja</label>
+                                        <input
+                                            className={`ca-input ${clientFormErrors.dateOfBirth ? "ca-input--error" : ""}`}
+                                            name="dateOfBirth"
+                                            type="date"
+                                            value={clientForm.dateOfBirth}
+                                            onChange={handleClientFormChange}
+                                        />
+                                        {clientFormErrors.dateOfBirth && <p className="ca-error">{clientFormErrors.dateOfBirth}</p>}
+                                    </div>
+                                </div>
+
+                                <div className="ca-field">
+                                    <label className="ca-field-label">Adresa</label>
+                                    <input
+                                        className={`ca-input ${clientFormErrors.address ? "ca-input--error" : ""}`}
+                                        name="address"
+                                        value={clientForm.address}
+                                        onChange={handleClientFormChange}
+                                        placeholder="Ulica i broj, grad"
+                                    />
+                                    {clientFormErrors.address && <p className="ca-error">{clientFormErrors.address}</p>}
+                                </div>
+
+                                {clientFormErrors.submit && (
+                                    <p className="ca-error ca-error--submit">{clientFormErrors.submit}</p>
+                                )}
+
+                                <div className="ca-actions">
+                                    <button
+                                        type="button"
+                                        className="ca-btn-back"
+                                        onClick={closeClientModal}
+                                        disabled={clientSubmitting}
+                                    >
+                                        Otkaži
+                                    </button>
+
+                                    <button
+                                        type="submit"
+                                        className="ca-btn-submit"
+                                        disabled={clientSubmitting}
+                                    >
+                                        {clientSubmitting ? "Kreiranje..." : "Sačuvaj klijenta"}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

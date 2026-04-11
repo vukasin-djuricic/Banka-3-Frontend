@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createEmployee, updateEmployee, getEmployees } from "../services/EmployeeService";
 import { PERMISSIONS } from "../constants/permissions";
 import "./CreateEmployeePage.css";
 import "../pages/EmployeesPage.css";
 import { useNavigate } from "react-router-dom";
-import MenuDropdown from "../components/MenuDropdown";
+import Sidebar from "../components/Sidebar.jsx";
 
 function validate(form) {
   const errors = {};
@@ -62,6 +62,17 @@ export default function CreateEmployeePage() {
   const [successMsg, setSuccessMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const permissions = JSON.parse(sessionStorage.getItem("permissions") || "[]");
+  const isAdmin = permissions.includes("admin");
+
+  useEffect(() => {
+    if (!isAdmin) {
+      navigate("/employees", { replace: true });
+    }
+  }, [isAdmin, navigate]);
+
+  if (!isAdmin) return null;
+
   function handlePermissionToggle(value) {
     setForm((prev) => ({
       ...prev,
@@ -93,14 +104,14 @@ export default function CreateEmployeePage() {
     setLoading(true);
 
     try {
-      let dateOfBirth = 0;
+      let dateOfBirth = "";
 
       if (form.datum) {
         const [dd, mm, yyyy] = form.datum.split(".");
-        dateOfBirth = Math.floor(new Date(`${yyyy}-${mm}-${dd}`).getTime() / 1000);
+        dateOfBirth = `${yyyy}-${mm}-${dd}`;
       }
 
-      const response = await createEmployee({
+      await createEmployee({
         firstName: form.ime,
         lastName: form.prezime,
         dateOfBirth,
@@ -122,6 +133,10 @@ export default function CreateEmployeePage() {
 
           if (!created) throw new Error("Nije moguće pronaći kreiranog zaposlenog.");
 
+          const safePermissions = isAdmin
+              ? form.permissions
+              : form.permissions.filter((permission) => permission !== "admin");
+
           await updateEmployee(created.id, {
             firstName: form.ime,
             lastName: form.prezime,
@@ -129,9 +144,9 @@ export default function CreateEmployeePage() {
             phoneNumber: form.telefon,
             address: form.adresa,
             position: form.pozicija,
-            department: "form.department",
+            department: form.department,
             active: true,
-            permissions: form.permissions,
+            permissions: safePermissions,
           });
         } catch {
           setSuccessMsg(
@@ -183,8 +198,7 @@ export default function CreateEmployeePage() {
       čist layout bez debug background-a i bez inline stilova
     */
     <div className="page-bg">
-      <img src="/bank-logo.png" alt="logo" className="bank-logo" />
-      <MenuDropdown />
+      <Sidebar />
 
       <div className="create-page">
         <div className="create-form-card">

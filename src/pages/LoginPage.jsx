@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { login } from "../services/AuthService";
-import { getClientByEmail } from "../services/ClientService";
+import { useState, useEffect } from "react";
+import { login, clearAuthState } from "../services/AuthService";
+import useFailedAttempts, { BLOCKED_MESSAGE } from "../utils/useFailedAttempts";
 import "./LoginPage.css";
 import { useNavigate } from "react-router-dom";
 
@@ -10,17 +10,26 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const { isBlocked, increment, reset } = useFailedAttempts("login");
+  const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    if (sessionStorage.getItem("sessionExpired")) {
+      setMessage("Vaša sesija je istekla, molimo prijavite se ponovo.");
+      sessionStorage.removeItem("sessionExpired");
+    }
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!email || !password) {
-      setMessage("Unesite email i lozinku");
+    if (isBlocked) {
+      setMessage(BLOCKED_MESSAGE);
       return;
     }
 
-    if (!email.includes("@")) {
-      setMessage("Email nije validan");
+    if (!email || !password) {
+      setMessage("Unesite email i lozinku");
       return;
     }
 
@@ -29,47 +38,61 @@ export default function LoginPage() {
 
     try {
       const data = await login(email, password);
+      reset();
 
-      localStorage.setItem("accessToken", data.accessToken);
-      localStorage.setItem("refreshToken", data.refreshToken);
-      if (data.userId) localStorage.setItem("userId", data.userId);
+      sessionStorage.setItem("accessToken", data.accessToken);
+      sessionStorage.setItem("refreshToken", data.refreshToken);
+      sessionStorage.setItem("permissions", JSON.stringify(data.permissions));
+      const permissions = data.permissions || [];
 
-      // TODO: Tehnički dug — backend treba da uvede GET /api/me endpoint
-      // koji vraća ulogovanog korisnika sa rolom, umesto da frontend pogađa
-      // rolu probanjem /api/clients endpointa.
-      try {
-        const client = await getClientByEmail(email);
-        if (client) {
-          localStorage.setItem("userRole", "client");
-          localStorage.setItem("userId", client.id);
-          navigate("/dashboard");
-          return;
-        }
-      } catch {
-        // Nije client — nastavljamo kao employee
+      if (permissions.includes("admin") || permissions.length > 0) {
+        sessionStorage.setItem("userRole", "employee");
+        navigate("/employees");
+      } else {
+        sessionStorage.setItem("userRole", "client");
+        navigate("/dashboard");
       }
-
-      localStorage.setItem("userRole", "employee");
-      navigate("/employees");
     } catch (err) {
+      console.error("Login error:", err);
+
       if (err.response) {
-        if (err.response.status === 401) {
+        const status = err.response.status;
+        const serverMsg = err.response.data;
+        const serverMsgText =
+          typeof serverMsg === "string"
+            ? serverMsg
+            : serverMsg?.error || serverMsg?.message || "";
+        const normalized = String(serverMsgText).toLowerCase();
+
+        if (
+          status === 403 &&
+          (normalized.includes("activate") ||
+            normalized.includes("aktiv") ||
+            normalized.includes("set password") ||
+            normalized.includes("password") ||
+            normalized.includes("expired") ||
+            normalized.includes("inactive"))
+        ) {
+          setMessage(
+            "Nalog još nije aktiviran. Proverite email i postavite lozinku putem linka za aktivaciju (ili zatražite novi link)."
+          );
+        } else if (status === 401) {
+          increment();
           setMessage("Pogrešan email ili lozinka");
         } else {
-          setMessage("Greška pri prijavljivanju. Pokušajte ponovo.");
+          setMessage("Greška na serveru pri prijavi.");
         }
-      } else if (err.request) {
-        setMessage("Greška u konekciji sa serverom");
       } else {
-        setMessage(err.message || "Nepoznata greška");
+        setMessage("Mrežna greška. Proverite da li je Backend pokrenut.");
       }
+      clearAuthState();
     } finally {
       setLoading(false);
     }
   };
 
   const handleForgotPassword = () => {
-      navigate("/forgot-password");
+    navigate("/forgot-password");
   };
 
   return (
@@ -85,13 +108,13 @@ export default function LoginPage() {
           <div className="form-field">
             <label htmlFor="email">EMAIL</label>
             <div className="input-wrapper">
-              <span className="input-icon">✉</span>
               <input
                 id="email"
                 type="email"
                 placeholder="unesite adresu..."
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
               />
             </div>
           </div>
@@ -99,27 +122,49 @@ export default function LoginPage() {
           <div className="form-field">
             <label htmlFor="password">LOZINKA</label>
             <div className="input-wrapper">
-              <span className="input-icon">🔒</span>
               <input
                 id="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 placeholder="unesite lozinku..."
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
               />
-              <span className="input-icon right">👁</span>
+              <button
+                type="button"
+                className="toggle-password"
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-label={showPassword ? "Sakrij lozinku" : "Prikaži lozinku"}
+              >
+                {showPassword ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                    <line x1="1" y1="1" x2="23" y2="23"/>
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                )}
+              </button>
             </div>
           </div>
-
-          <button type="submit" className="login-button" disabled={loading}>
-            {loading ? "Prijavljivanje..." : "Prijavi se"}
-          </button>
 
           <p className="forgot-password" onClick={handleForgotPassword}>
             Zaboravili ste lozinku?
           </p>
 
-          {message && <p className="message">{message}</p>}
+          <button type="submit" className="login-button" disabled={loading || isBlocked}>
+            {loading ? "Prijavljivanje..." : "Prijavi se"}
+          </button>
+
+          {isBlocked ? (
+            <p className="message login-blocked">{BLOCKED_MESSAGE}</p>
+          ) : (
+            message && <p className="message">{message}</p>
+          )}
         </form>
 
         <p className="login-footer">Banka 2026 • Računarski fakultet</p>

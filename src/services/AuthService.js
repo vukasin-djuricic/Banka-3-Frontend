@@ -1,22 +1,46 @@
 import api from "./api.js";
 import { clearClientCache } from "./ClientService.js";
 
+// Module-level flag koji signalizira axios interceptoru da je logout u toku.
+// Sprečava race condition: in-flight 401 → refresh → upis novih tokena u
+// sessionStorage POSLE što je logout već obrisao stanje (M1 iz audit-a #162).
+let isLoggingOut = false;
+export const getIsLoggingOut = () => isLoggingOut;
+
+// Centralno brisanje svih auth tragova (sessionStorage + in-memory cache).
+// Koristi se iz svakog izlaznog puta: logout, api.js interceptor (istek),
+// Sidebar fallback, LoginPage error handler.
+export const clearAuthState = () => {
+  sessionStorage.removeItem("accessToken");
+  sessionStorage.removeItem("refreshToken");
+  sessionStorage.removeItem("userId");
+  sessionStorage.removeItem("userRole");
+  sessionStorage.removeItem("permissions");
+  clearClientCache();
+};
+
 export const login = async (email, password) => {
   const response = await api.post("/login", { email, password });
+
   return {
-    accessToken: response.data.access_token,
-    refreshToken: response.data.refresh_token,
-    userId: response.data.user_id,
+    accessToken: response.data.accessToken || response.data.access_token,
+    refreshToken: response.data.refreshToken || response.data.refresh_token,
+    userId: response.data.userId || response.data.user_id,
+    permissions: response.data.permissions || [],
   };
 };
 
 export const logout = async () => {
-  await api.post("/logout");
-  localStorage.removeItem("accessToken");
-  localStorage.removeItem("refreshToken");
-  localStorage.removeItem("userId");
-  localStorage.removeItem("userRole");
-  clearClientCache();
+  isLoggingOut = true;
+  try {
+    await api.post("/logout");
+  } catch {
+    // Ignorišemo grešku — backend revocation je best-effort. Čišćenje lokalnog
+    // stanja u finally bloku je obavezno čak i ako server padne (H2).
+  } finally {
+    clearAuthState();
+    isLoggingOut = false;
+  }
 };
 
 export const refreshToken = async (refreshToken) => {
@@ -42,12 +66,12 @@ export const confirmPasswordReset = async (token, newPassword) => {
 };
 
 export const getCurrentUserId = () => {
-  return localStorage.getItem("userId");
+  return sessionStorage.getItem("userId");
 };
 
 export const getTokenPayload = () => {
   try {
-    const token = localStorage.getItem("accessToken");
+    const token = sessionStorage.getItem("accessToken");
     if (!token) return null;
     return JSON.parse(atob(token.split(".")[1]));
   } catch {
@@ -57,4 +81,22 @@ export const getTokenPayload = () => {
 
 export const getCurrentUserEmail = () => {
   return getTokenPayload()?.sub || null;
+};
+
+export const beginTotpSetup = async () => {
+  const response = await api.post("/totp/setup/begin");
+  return response.data;
+};
+
+export const confirmTotpSetup = async (code) => {
+  const response = await api.post("/totp/setup/confirm", { code });
+  return response.data;
+};
+
+export const getPermissions = () => {
+  try {
+    return JSON.parse(sessionStorage.getItem("permissions") || "[]");
+  } catch {
+    return [];
+  }
 };

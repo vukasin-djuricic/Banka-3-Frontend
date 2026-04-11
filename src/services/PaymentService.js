@@ -1,112 +1,157 @@
-const mockRecipients = [
-  { id: 1, name: "Marko Nikolić", account_number: "102-39443942389" },
-  { id: 2, name: "Ana Petrović", account_number: "102-394438340549" },
-  { id: 3, name: "Jovana Jovanović", account_number: "105-12345678901" },
-  { id: 4, name: "Stefan Ilić", account_number: "160-98765432101" },
-  { id: 5, name: "Milica Stojanović", account_number: "265-11223344556" },
-  { id: 6, name: "Dragan Popović", account_number: "325-99887766554" },
-];
+import api from "./api.js";
+import {
+  normalizeAccountNumberInput,
+  stringifyAccountNumber,
+} from "../utils/accountNumber.js";
 
-const mockTransactions = [
-  {
-    from_account: "102-39443942389",
-    to_account: "102-394438340549",
-    initial_amount: 15000,
-    final_amount: 15000,
-    fee: 0,
-    currency: "RSD",
-    payment_code: "289",
-    reference_number: "117.6926",
-    purpose: "Plaćanje računa za struju",
-    status: "Realizovano",
-    timestamp: "2025-03-10T14:15:22Z",
-  },
-  {
-    from_account: "102-39443942389",
-    to_account: "105-12345678901",
-    initial_amount: 500,
-    final_amount: 500,
-    fee: 0,
-    currency: "EUR",
-    payment_code: "289",
-    reference_number: "220.1134",
-    purpose: "Povrat duga",
-    status: "Realizovano",
-    timestamp: "2025-03-08T09:30:00Z",
-  },
-  {
-    from_account: "102-39443942389",
-    to_account: "160-98765432101",
-    initial_amount: 3200,
-    final_amount: 3200,
-    fee: 0,
-    currency: "RSD",
-    payment_code: "221",
-    reference_number: "334.7812",
-    purpose: "Kirija za mart",
-    status: "Na čekanju",
-    timestamp: "2025-03-07T11:00:00Z",
-  },
-  {
-    from_account: "102-39443942389",
-    to_account: "265-11223344556",
-    initial_amount: 8750,
-    final_amount: 8750,
-    fee: 0,
-    currency: "RSD",
-    payment_code: "289",
-    reference_number: "451.9021",
-    purpose: "Usluge konsaltinga",
-    status: "Realizovano",
-    timestamp: "2025-03-05T16:45:00Z",
-  },
-  {
-    from_account: "102-39443942389",
-    to_account: "325-99887766554",
-    initial_amount: 12000,
-    final_amount: 12000,
-    fee: 0,
-    currency: "RSD",
-    payment_code: "289",
-    reference_number: "562.3344",
-    purpose: "Uplata po ugovoru br. 45",
-    status: "Odbijeno",
-    timestamp: "2025-03-03T08:20:00Z",
-  },
-  {
-    from_account: "102-39443942389",
-    to_account: "102-394438340549",
-    initial_amount: 200,
-    final_amount: 200,
-    fee: 0,
-    currency: "EUR",
-    payment_code: "289",
-    reference_number: "613.5567",
-    purpose: "Poklon",
-    status: "Realizovano",
-    timestamp: "2025-02-28T12:00:00Z",
-  },
-  {
-    from_account: "102-39443942389",
-    to_account: "105-12345678901",
-    initial_amount: 4500,
-    final_amount: 4500,
-    fee: 0,
-    currency: "RSD",
-    payment_code: "221",
-    reference_number: "714.2289",
-    purpose: "Studentska pomoć",
-    status: "Na čekanju",
-    timestamp: "2025-02-25T10:10:00Z",
-  },
-];
-
-export async function getRecipients() {
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  return mockRecipients;
+function mapRecipient(recipient) {
+  if (!recipient || typeof recipient !== "object") return recipient;
+  return {
+    ...recipient,
+    account_number: stringifyAccountNumber(recipient.account_number),
+  };
 }
 
-export async function getTransactions() {
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  return mockTransactions;
+export async function getRecipients() {
+  const response = await api.get("/recipients");
+  return Array.isArray(response.data) ? response.data.map(mapRecipient) : response.data;
+}
+
+export async function getTransactions(filters = {}) {
+  const params = {};
+
+  if (filters.status) {
+    const statusMap = {
+      Realizovano: "realized",
+      "Na čekanju": "pending",
+      Odbijeno: "rejected",
+      Odobreno: "approved",
+    };
+    params.status = statusMap[filters.status] || filters.status;
+  }
+
+  if (filters.dateFrom) params.date = filters.dateFrom;
+  if (filters.dateTo) params.dateTo = filters.dateTo;
+
+  if (filters.amountMin || filters.amountMax) {
+    const min = filters.amountMin || 0;
+    const max = filters.amountMax || 999999999;
+    params.amount = `${min}-${max}`;
+  }
+
+  try {
+    const response = await api.get("/transactions", { params });
+
+    const data = Array.isArray(response.data) ? response.data : [];
+
+    const statusReverseMap = {
+      realized: "Realizovano",
+      completed: "Realizovano",
+      pending: "Na čekanju",
+      rejected: "Odbijeno",
+      approved: "Odobreno",
+    };
+
+    const processedData = data.map((tx) => ({
+      ...tx,
+      status: statusReverseMap[tx.status] || tx.status || "Realizovano",
+      currency: tx.currency || "RSD",
+    }));
+
+    return processedData;
+  } catch (error) {
+    console.error("❌ API ERROR:", error);
+    throw error;
+  }
+}
+
+export async function createRecipient(recipientData) {
+  const payload = {
+    ...recipientData,
+    account_number: normalizeAccountNumberInput(recipientData.account_number),
+  };
+  const response = await api.post("/recipients", payload);
+  return mapRecipient(response.data);
+}
+
+export async function updateRecipient(id, recipientData) {
+  const payload = {
+    ...recipientData,
+    account_number: normalizeAccountNumberInput(recipientData.account_number),
+  };
+  const response = await api.put(`/recipients/${id}`, payload);
+  return mapRecipient(response.data);
+}
+
+export async function deleteRecipient(id) {
+  const response = await api.delete(`/recipients/${id}`);
+  return response.data;
+}
+
+export async function createPayment(paymentData, totpCode) {
+  const config = totpCode ? { headers: { TOTP: totpCode } } : {};
+  const payload = {
+    ...paymentData,
+    sender_account: stringifyAccountNumber(paymentData.sender_account),
+    recipient_account: normalizeAccountNumberInput(paymentData.recipient_account),
+  };
+  const response = await api.post("/transactions/payment", payload, config);
+  return response.data;
+}
+
+export async function createTransfer(transferData, totpCode) {
+  const config = totpCode ? { headers: { TOTP: totpCode } } : {};
+  const payload = {
+    ...transferData,
+    from_account: stringifyAccountNumber(transferData.from_account),
+    to_account: stringifyAccountNumber(transferData.to_account),
+  };
+  const response = await api.post("/transactions/transfer", payload, config);
+  return response.data;
+}
+
+export function mapPaymentError(error) {
+  if (!error?.response) {
+    return "Plaćanje trenutno nije moguće zbog problema sa mrežom. Pokušajte ponovo.";
+  }
+
+  const status = error.response?.status;
+  const raw =
+      error.response?.data?.message ||
+      error.response?.data?.error ||
+      error.response?.data?.details ||
+      error.response?.data ||
+      "";
+
+  const message = String(raw).toLowerCase().trim();
+
+  if (message.includes("insufficient") || message.includes("fund")) {
+    return "Nemate dovoljno sredstava na izabranom računu za ovo plaćanje.";
+  }
+
+  if (message.includes("inactive")) {
+    return "Račun primaoca nije aktivan i uplata trenutno nije moguća.";
+  }
+
+  if (message.includes("daily limit") || message.includes("limit exceeded")) {
+    return "Prekoračili ste dnevni limit za plaćanja sa ovog računa.";
+  }
+
+  if (message.includes("account not found")) {
+    return "Uneti račun nije pronađen. Proverite broj računa i pokušajte ponovo.";
+  }
+
+  if (
+      message.includes("exchange service unavailable") ||
+      message.includes("service unavailable") ||
+      status === 503
+  ) {
+    return "Plaćanje trenutno nije moguće zbog privremenog problema sa sistemom. Pokušajte ponovo kasnije.";
+  }
+
+  if (message.includes("totp") || message.includes("kod")) {
+    return "Uneti TOTP kod nije ispravan. Pokušajte ponovo.";
+  }
+
+  return "Došlo je do greške pri obradi plaćanja. Proverite unete podatke i pokušajte ponovo.";
 }
